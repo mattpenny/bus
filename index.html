@@ -83,20 +83,39 @@
   h3 { margin: 0 0 8px; font-size: 14px; }
   h3 small { color: #666; font-weight: normal; font-size: 12px; }
 
-  .direction-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-  .direction-row .label { font-size: 14px; font-weight: 600; color: #333; flex-shrink: 0; }
+  /* ============ 方向列：label 與 chip 同一行 ============ */
+  .direction-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .direction-row .label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    flex-shrink: 0;
+  }
   .direction-chip {
-    flex: 1; padding: 8px 12px;
-    border: 1px solid #1a3d7c; border-radius: 8px;
-    background: #eaf1ff; color: #1a3d7c;
-    font-size: 13px; font-weight: 600; cursor: pointer;
-    text-align: center; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis;
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #1a3d7c;
+    border-radius: 8px;
+    background: #eaf1ff;
+    color: #1a3d7c;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     transition: background 0.15s;
   }
   .direction-chip:hover { background: #dbe9ff; }
-  .direction-chip .arrow { margin: 0 4px; }
+  .direction-chip:active { background: #c8dcff; }
 
+  /* 方向清單（未選方向 / 點 chip 重選時） */
   .direction-picker { list-style: none; padding: 0; margin: 0 0 8px; }
   .direction-picker li {
     padding: 9px 11px; border: 1px solid #dde;
@@ -331,36 +350,32 @@
 
       <!-- =========================================================
            方向區塊
-           若尚未選方向且有多於 1 個 → 直接顯示清單
-           若已選方向 → 顯示 chip（點擊可重選）
+           未選方向 / 點 chip 重選 → 顯示清單
+           已選方向 → 顯示 chip（方向 label 與 chip 同一行）
            ========================================================= -->
 
-      <!-- 尚未選方向，顯示清單讓使用者挑 -->
-      <template v-if="!selectedRoute && matchedRoutes.length > 1">
-        <div class="direction-row">
+      <!-- 尚未選方向，或正在重選：顯示清單 -->
+      <div v-if="!selectedDirectionLabel || pickingDirection">
+        <div v-if="matchedRoutes.length > 1" class="direction-row">
           <span class="label">方向</span>
         </div>
-        <ul class="direction-picker">
-          <li v-for="r in matchedRoutes" :key="r.key" @click="selectDirection(r)">
+        <ul v-if="matchedRoutes.length > 1" class="direction-picker">
+          <li v-for="r in matchedRoutes"
+              :key="r.key"
+              :class="{ active: routeKey === r.key }"
+              @click="selectDirection(r)">
             <span>{{ r.orig_tc }} <span class="arrow">→</span> {{ r.dest_tc }}</span>
           </li>
         </ul>
-      </template>
+      </div>
 
-      <!-- 已選方向，顯示 chip -->
-      <div v-if="selectedRoute" class="direction-row">
+      <!-- 已選方向：顯示 chip -->
+      <div v-else class="direction-row">
         <span class="label">方向</span>
-        <div class="direction-chip" @click="toggleDirectionPicker">
-          {{ selectedRoute.orig_tc }}<span class="arrow">→</span>{{ selectedRoute.dest_tc }}
+        <div class="direction-chip" @click="clearDirection">
+          {{ selectedDirectionLabel }}
         </div>
       </div>
-      <ul v-if="selectedRoute && pickingDirection" class="direction-picker">
-        <li v-for="r in matchedRoutes" :key="r.key"
-            :class="{ active: routeKey === r.key }"
-            @click="selectDirection(r)">
-          <span>{{ r.orig_tc }} <span class="arrow">→</span> {{ r.dest_tc }}</span>
-        </li>
-      </ul>
 
       <!-- 找不到路線 -->
       <div v-if="searched && !matchedRoutes.length" class="hint">
@@ -490,7 +505,10 @@ async function fetchKmbRouteStops(route, direction, serviceType = "1") {
 async function fetchKmbStop(stopId) {
   const j = await getJSON(`${KMB_BASE}/stop/${stopId}`);
   const s = j.data;
-  return { id: s.stop, name: s.name_tc, lat: +s.lat, lng: +s.long };
+  const lat = parseFloat(s.lat);
+  const lng = parseFloat(s.long);
+  if (!isFinite(lat) || !isFinite(lng)) return null;
+  return { id: s.stop, name: s.name_tc, lat, lng };
 }
 async function fetchKmbEta(stopId, route, serviceType = "1") {
   const j = await getJSON(`${KMB_BASE}/eta/${stopId}/${route}/${serviceType}`);
@@ -528,7 +546,10 @@ async function fetchCitybusRouteStops(route, direction) {
 async function fetchCitybusStop(stopId) {
   const j = await getJSON(`${CTB_BASE}/stop/${stopId}`);
   const s = j.data;
-  return { id: s.stop, name: s.name_tc, lat: +s.lat, lng: +s.long };
+  const lat = parseFloat(s.lat);
+  const lng = parseFloat(s.long);
+  if (!isFinite(lat) || !isFinite(lng)) return null;
+  return { id: s.stop, name: s.name_tc, lat, lng };
 }
 async function fetchCitybusEta(stopId, route) {
   const j = await getJSON(`${CTB_BASE}/eta/CTB/${stopId}/${route}`);
@@ -659,6 +680,7 @@ createApp({
     const lastSearched = ref("");
     const searched = ref(false);
     const routeKey = ref("");
+    const selectedDirectionLabel = ref("");
     const stops = ref([]);
     const selectedStop = ref(null);
     const etas = ref([]);
@@ -683,10 +705,6 @@ createApp({
       return [...map.values()];
     });
 
-    const selectedRoute = computed(
-      () => matchedRoutes.value.find(r => r.key === routeKey.value) || null
-    );
-
     const mapRowText = computed(() => {
       if (selectedStop.value) return selectedStop.value.name;
       if (stops.value.length) return "點擊查看路線地圖";
@@ -696,6 +714,7 @@ createApp({
     async function loadRoutes() {
       error.value = "";
       routeKey.value = "";
+      selectedDirectionLabel.value = "";
       stops.value = [];
       selectedStop.value = null;
       etas.value = [];
@@ -746,6 +765,7 @@ createApp({
         lastSearched.value = q.toUpperCase();
         searched.value = true;
         routeKey.value = "";
+        selectedDirectionLabel.value = "";
         stops.value = [];
         selectedStop.value = null;
         etas.value = [];
@@ -770,12 +790,21 @@ createApp({
       }
     }
 
-    function toggleDirectionPicker() {
-      pickingDirection.value = !pickingDirection.value;
+    /* 點 chip → 清除目前選擇，重新顯示方向清單 */
+    function clearDirection() {
+      routeKey.value = "";
+      selectedDirectionLabel.value = "";
+      pickingDirection.value = true;
+      stops.value = [];
+      selectedStop.value = null;
+      etas.value = [];
+      dataAge.value = null;
+      statusText.value = "請重新選擇方向";
     }
 
     async function selectDirection(r) {
       routeKey.value = r.key;
+      selectedDirectionLabel.value = `${r.orig_tc} → ${r.dest_tc}`;
       pickingDirection.value = false;
       loadingStops.value = true;
       error.value = "";
@@ -787,10 +816,12 @@ createApp({
         let detailed = [];
         if (company.value === "KMB" || company.value === "LWB") {
           const seq = await fetchKmbRouteStops(r.route, r.direction, r.serviceType || "1");
-          detailed = await Promise.all(seq.map(s => fetchKmbStop(s.stopId)));
+          const results = await Promise.all(seq.map(s => fetchKmbStop(s.stopId)));
+          detailed = results.filter(s => s !== null);
         } else {
           const seq = await fetchCitybusRouteStops(r.route, r.direction);
-          detailed = await Promise.all(seq.map(s => fetchCitybusStop(s.stopId)));
+          const results = await Promise.all(seq.map(s => fetchCitybusStop(s.stopId)));
+          detailed = results.filter(s => s !== null);
         }
         const validStops = detailed.filter(s => isValidCoord(s.lat, s.lng));
         stops.value = validStops;
@@ -817,14 +848,18 @@ createApp({
           return;
         }
         navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          }),
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            if (!isValidCoord(lat, lng)) {
+              reject(new Error("無法取得位置資訊"));
+              return;
+            }
+            resolve({ lat, lng, accuracy: pos.coords.accuracy });
+          },
           (err) => {
             let msg = "定位失敗";
-            if (err.code === 1) msg = "未授權定位，請手動選擇巴士站";
+            if (err.code === 1) msg = "未授權定位";
             else if (err.code === 2) msg = "無法取得位置資訊";
             else if (err.code === 3) msg = "定位超時";
             reject(new Error(msg));
@@ -844,18 +879,26 @@ createApp({
         let nearest = null;
         let minDist = Infinity;
         for (const s of stops.value) {
+          if (!isValidCoord(s.lat, s.lng)) continue;
           s.distance = haversineMeters(me.lat, me.lng, s.lat, s.lng);
           if (s.distance < minDist) {
             minDist = s.distance;
             nearest = s;
           }
         }
-        if (!nearest) return;
+        if (!nearest) {
+          statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站`;
+          return;
+        }
         statusText.value = `最近車站：${nearest.name}（${formatDistance(minDist)}）`;
         await applySelection(nearest);
       } catch (e) {
-        const clean = (e.message || "定位失敗").replace(/\(.*?\)/g, "").trim();
-        statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站（${clean}）`;
+        const friendly =
+          /授權|permission/i.test(e.message) ? "未授權定位，請手動選擇巴士站" :
+          /超時|timeout/i.test(e.message)    ? "定位超時，請手動選擇巴士站" :
+          /位置|position/i.test(e.message)   ? "無法取得位置資訊" :
+          "定位失敗，請手動選擇巴士站";
+        statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站（${friendly}）`;
       }
     }
 
@@ -866,6 +909,7 @@ createApp({
     }
 
     async function applySelection(stop) {
+      if (!stop || !isValidCoord(stop.lat, stop.lng)) return;
       selectedStop.value = stop;
       if (mapExpanded.value) mapExpanded.value = false;
       await nextTick();
@@ -895,8 +939,9 @@ createApp({
 
     async function refreshEta() {
       const stop = selectedStop.value;
-      const r = selectedRoute.value;
-      if (!stop || !r) return;
+      if (!stop) return;
+      const r = findCurrentRoute();
+      if (!r) return;
       try {
         let result;
         if (company.value === "KMB" || company.value === "LWB") {
@@ -913,12 +958,19 @@ createApp({
       }
     }
 
+    /* 從 matchedRoutes 找目前選中的方向 */
+    function findCurrentRoute() {
+      return matchedRoutes.value.find(r => r.key === routeKey.value) || null;
+    }
+    const selectedRoute = computed(() => findCurrentRoute());
+
     function formatMinutes(m) {
       if (m === null || m === undefined) return "—";
       if (m <= 0) return "即將到站";
       return m + " 分鐘";
     }
 
+    /* ---------- 地圖 ---------- */
     let mapDesktop = null;
     let mapMobile  = null;
     let activeMap  = null;
@@ -967,10 +1019,12 @@ createApp({
           marker.setIcon(s.id === selectedStop.value.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
           marker.setZIndexOffset(s.id === selectedStop.value.id ? 1000 : 0);
         });
-        activeMap.setView(
-          [selectedStop.value.lat, selectedStop.value.lng],
-          Math.max(activeMap.getZoom(), 15)
-        );
+        try {
+          activeMap.setView(
+            [selectedStop.value.lat, selectedStop.value.lng],
+            Math.max(activeMap.getZoom(), 15)
+          );
+        } catch (e) { /* ignore */ }
       } else {
         try {
           activeMap.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
@@ -984,15 +1038,19 @@ createApp({
         marker.setIcon(s.id === stop.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
         marker.setZIndexOffset(s.id === stop.id ? 1000 : 0);
       });
-      const targetZoom = Math.max(activeMap.getZoom(), 15);
-      activeMap.flyTo([stop.lat, stop.lng], targetZoom, { duration: 0.6 });
+      try {
+        const targetZoom = Math.max(activeMap.getZoom(), 15);
+        activeMap.flyTo([stop.lat, stop.lng], targetZoom, { duration: 0.6 });
+      } catch (e) { /* ignore */ }
     }
 
     function showUserMarker(lat, lng) {
       if (!activeMap || !isValidCoord(lat, lng)) return;
       if (activeUserMarker) activeMap.removeLayer(activeUserMarker);
-      activeUserMarker = L.marker([lat, lng], { icon: USER_ICON }).addTo(activeMap);
-      activeUserMarker.bindTooltip("你的位置", { direction: "top" });
+      try {
+        activeUserMarker = L.marker([lat, lng], { icon: USER_ICON }).addTo(activeMap);
+        activeUserMarker.bindTooltip("你的位置", { direction: "top" });
+      } catch (e) { /* ignore */ }
     }
 
     async function expandMap() {
@@ -1075,9 +1133,9 @@ createApp({
       companies, company, routeInput, lastSearched, searched,
       allRoutes, matchedRoutes, routeKey, stops, selectedStop, etas, dataAge,
       loadingStops, error, statusText, showDebug, stopListRef,
-      mapExpanded, mapRowText, pickingDirection,
+      mapExpanded, mapRowText, pickingDirection, selectedDirectionLabel,
       onCompanyChange, onSearch, selectDirection, onStopClick,
-      expandMap, zoomIn, zoomOut, toggleDirectionPicker,
+      expandMap, zoomIn, zoomOut, clearDirection,
       formatMinutes, formatDistance,
     };
   },
