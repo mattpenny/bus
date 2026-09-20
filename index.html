@@ -143,9 +143,46 @@
   h3 { margin: 0 0 8px; font-size: 14px; }
   h3 small { color: #666; font-weight: normal; font-size: 12px; }
 
-  .direction-list { list-style: none; padding: 0; margin: 0 0 8px; }
-  .direction-list li {
-    padding: 7px 9px;
+  /* ============ 方向列（新） ============ */
+  .direction-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .direction-row .label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    flex-shrink: 0;
+  }
+  .direction-chip {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #1a3d7c;
+    border-radius: 8px;
+    background: #eaf1ff;
+    color: #1a3d7c;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s;
+  }
+  .direction-chip:hover { background: #dbe9ff; }
+  .direction-chip .arrow { margin: 0 4px; }
+
+  /* 展開的方向選擇清單 */
+  .direction-picker {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 8px;
+  }
+  .direction-picker li {
+    padding: 9px 11px;
     border: 1px solid #dde;
     border-radius: 6px;
     margin-bottom: 5px;
@@ -155,10 +192,11 @@
     justify-content: space-between;
     align-items: center;
     gap: 6px;
+    background: white;
   }
-  .direction-list li:hover { background: #f0f6ff; }
-  .direction-list li.active { background: #dbe9ff; border-color: #1a3d7c; font-weight: 600; }
-  .direction-list li .arrow { color: #1a3d7c; font-weight: bold; }
+  .direction-picker li:hover { background: #f0f6ff; }
+  .direction-picker li.active { background: #dbe9ff; border-color: #1a3d7c; font-weight: 600; }
+  .direction-picker li .arrow { color: #1a3d7c; font-weight: bold; }
 
   .stop-list {
     flex: 1;
@@ -400,7 +438,6 @@
       flex-shrink: 0;
     }
 
-    /* 展開時的地圖 */
     .map-expanded {
       display: block;
       width: 100%;
@@ -466,9 +503,7 @@
         </button>
       </div>
 
-      <div class="status">{{ statusText }}</div>
-
-      <!-- 收合的「地圖列」（mobile only） -->
+      <!-- ============ 地圖列（mobile only） ============ -->
       <div v-if="!mapExpanded"
            class="map-row-mobile"
            @click="expandMap">
@@ -477,7 +512,7 @@
         <span class="hint-tap">點擊放大地圖</span>
       </div>
 
-      <!-- 展開的地圖（mobile only） -->
+      <!-- ============ 展開的地圖（mobile only） ============ -->
       <div v-show="mapExpanded" class="map-expanded panel">
         <div id="map-mobile"></div>
         <div class="map-zoom-controls">
@@ -486,14 +521,25 @@
         </div>
       </div>
 
-      <div v-if="matchedRoutes.length">
-        <h3>方向</h3>
-        <ul class="direction-list">
-          <li v-for="r in matchedRoutes" :key="r.key" :class="{ active: routeKey === r.key }" @click="selectDirection(r)">
-            <span>{{ r.orig_tc }} <span class="arrow">→</span> {{ r.dest_tc }}</span>
-          </li>
-        </ul>
+      <!-- ============ 方向列（新） ============ -->
+      <div v-if="selectedRoute" class="direction-row">
+        <span class="label">方向</span>
+        <div class="direction-chip"
+             @click="toggleDirectionPicker"
+             :title="'點擊重新選擇方向'">
+          {{ selectedRoute.orig_tc }}<span class="arrow">→</span>{{ selectedRoute.dest_tc }}
+        </div>
       </div>
+
+      <!-- 展開的方向選擇清單 -->
+      <ul v-if="pickingDirection && matchedRoutes.length" class="direction-picker">
+        <li v-for="r in matchedRoutes"
+            :key="r.key"
+            :class="{ active: routeKey === r.key }"
+            @click="selectDirection(r)">
+          <span>{{ r.orig_tc }} <span class="arrow">→</span> {{ r.dest_tc }}</span>
+        </li>
+      </ul>
 
       <div v-else-if="searched && !matchedRoutes.length" class="hint">
         找不到路線「{{ lastSearched }}」
@@ -702,6 +748,17 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+/* 檢查座標是否有效，避免 Leaflet NaN 錯誤 */
+function isValidCoord(lat, lng) {
+  return (
+    typeof lat === "number" && typeof lng === "number" &&
+    isFinite(lat) && isFinite(lng) &&
+    lat >= -90 && lat <= 90 &&
+    lng >= -180 && lng <= 180 &&
+    !(lat === 0 && lng === 0)
+  );
+}
+
 /* =========================================================
    巴士標記 SVG
    ========================================================= */
@@ -818,6 +875,7 @@ createApp({
     const showDebug = ref(false);
     const stopListRef = ref(null);
     const mapExpanded = ref(false);
+    const pickingDirection = ref(false);
 
     const matchedRoutes = computed(() => {
       if (!searched.value) return [];
@@ -851,6 +909,7 @@ createApp({
       allRoutes.value = [];
       searched.value = false;
       mapExpanded.value = false;
+      pickingDirection.value = false;
       statusText.value = "載入路線清單中…";
       try {
         let list = [];
@@ -889,14 +948,30 @@ createApp({
       dataAge.value = null;
       error.value = "";
       mapExpanded.value = false;
+
       const count = matchedRoutes.value.length;
-      statusText.value = count === 0
-        ? `找不到路線「${q}」`
-        : `找到 ${count} 個方向`;
+      if (count === 0) {
+        statusText.value = `找不到路線「${q}」`;
+        pickingDirection.value = false;
+      } else if (count === 1) {
+        // 只有一個方向：自動選取，不顯示方向列
+        statusText.value = `找到 1 個方向`;
+        pickingDirection.value = false;
+        selectDirection(matchedRoutes.value[0]);
+      } else {
+        // 多個方向：顯示方向列讓使用者點擊
+        statusText.value = `找到 ${count} 個方向`;
+        pickingDirection.value = false;
+      }
+    }
+
+    function toggleDirectionPicker() {
+      pickingDirection.value = !pickingDirection.value;
     }
 
     async function selectDirection(r) {
       routeKey.value = r.key;
+      pickingDirection.value = false;
       loadingStops.value = true;
       error.value = "";
       stops.value = [];
@@ -912,8 +987,12 @@ createApp({
           const seq = await fetchCitybusRouteStops(r.route, r.direction);
           detailed = await Promise.all(seq.map(s => fetchCitybusStop(s.stopId)));
         }
-        stops.value = detailed;
-        statusText.value = `路線 ${r.route} 共 ${stops.value.length} 個站`;
+        // 過濾掉座標無效的站，避免 Leaflet NaN 錯誤
+        const validStops = detailed.filter(s => isValidCoord(s.lat, s.lng));
+        const dropped = detailed.length - validStops.length;
+        if (dropped > 0) dbg(`略過 ${dropped} 個無效座標的站`, "info");
+        stops.value = validStops;
+        statusText.value = `路線 ${r.route} 共 ${validStops.length} 個站`;
 
         if (mapDesktop) {
           activeMap = mapDesktop;
@@ -973,11 +1052,12 @@ createApp({
         }
         if (!nearest) return;
         statusText.value = `最近車站：${nearest.name}（${formatDistance(minDist)}）`;
-
-        // 標記為選中（同步 UI + 地圖）
         await applySelection(nearest);
       } catch (e) {
-        statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站（${e.message}）`;
+        // 去掉技術錯誤訊息，只顯示人性化的提示
+        const msg = e.message || "定位失敗";
+        const clean = msg.replace(/\(.*?\)/g, "").trim(); // 移除括號內的技術細節
+        statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站（${clean}）`;
       }
     }
 
@@ -988,34 +1068,30 @@ createApp({
     }
 
     /* =========================================================
-       選中巴士站（共用邏輯）
+       選中巴士站
        ========================================================= */
     async function applySelection(stop) {
       selectedStop.value = stop;
-      mapExpanded.value = false;
-      await nextTick();
 
-      // 修正 1：分階段滾動，確保 mobile DOM 已 layout
+      // 手機版：如果地圖是展開的，選站後自動收合；展開時則不動作
+      if (mapExpanded.value) mapExpanded.value = false;
+
+      await nextTick();
       await scrollSelectedIntoView(stop);
 
-      // 更新目前啟用中的地圖
       if (activeMap) focusMapOnStop(stop);
-
       await refreshEta();
     }
 
-    /* 穩定版 scrollIntoView — 處理 mobile 首次展開後 layout 尚未完成的情況 */
     async function scrollSelectedIntoView(stop) {
       const container = stopListRef.value;
       if (!container) return;
       const el = container.querySelector(`[data-stop-id="${stop.id}"]`);
       if (!el) return;
 
-      // 兩階段：先 rAF，再一個 setTimeout，涵蓋不同瀏覽器的 layout 時機
       await new Promise((r) => requestAnimationFrame(() => r()));
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       await new Promise((r) => setTimeout(r, 250));
-      // 若還在視窗外，再試一次
       const rect = el.getBoundingClientRect();
       const cRect = container.getBoundingClientRect();
       if (rect.top < cRect.top || rect.bottom > cRect.bottom) {
@@ -1024,7 +1100,6 @@ createApp({
     }
 
     async function onStopClick(stop) {
-      // 使用者主動點擊：走相同邏輯
       await applySelection(stop);
     }
 
@@ -1085,7 +1160,11 @@ createApp({
       activeMarkers = [];
       if (!stops.value.length) return;
 
-      stops.value.forEach(s => {
+      // 只保留有有效座標的站
+      const drawable = stops.value.filter(s => isValidCoord(s.lat, s.lng));
+      if (!drawable.length) return;
+
+      drawable.forEach(s => {
         const marker = L.marker([s.lat, s.lng], { icon: BUS_PIN_DEFAULT }).addTo(activeMap);
         marker.bindTooltip(s.name, { direction: "top", offset: [0, -26] });
         marker.on("click", () => onStopClick(s));
@@ -1093,27 +1172,30 @@ createApp({
       });
 
       activeRouteLine = L.polyline(
-        stops.value.map(s => [s.lat, s.lng]),
+        drawable.map(s => [s.lat, s.lng]),
         { color: "#1a3d7c", weight: 3, opacity: 0.55, dashArray: "6,6" }
       ).addTo(activeMap);
 
-      // 復原選中標記
-      if (selectedStop.value) {
+      if (selectedStop.value && isValidCoord(selectedStop.value.lat, selectedStop.value.lng)) {
         activeMarkers.forEach(({ marker, stop: s }) => {
           marker.setIcon(s.id === selectedStop.value.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
           marker.setZIndexOffset(s.id === selectedStop.value.id ? 1000 : 0);
         });
-      }
-
-      if (selectedStop.value) {
-        activeMap.setView([selectedStop.value.lat, selectedStop.value.lng], Math.max(activeMap.getZoom(), 15));
+        activeMap.setView(
+          [selectedStop.value.lat, selectedStop.value.lng],
+          Math.max(activeMap.getZoom(), 15)
+        );
       } else {
-        activeMap.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
+        try {
+          activeMap.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
+        } catch (e) {
+          // 忽略
+        }
       }
     }
 
     function focusMapOnStop(stop) {
-      if (!activeMap) return;
+      if (!activeMap || !isValidCoord(stop.lat, stop.lng)) return;
       activeMarkers.forEach(({ marker, stop: s }) => {
         marker.setIcon(s.id === stop.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
         marker.setZIndexOffset(s.id === stop.id ? 1000 : 0);
@@ -1123,7 +1205,7 @@ createApp({
     }
 
     function showUserMarker(lat, lng) {
-      if (!activeMap) return;
+      if (!activeMap || !isValidCoord(lat, lng)) return;
       if (activeUserMarker) activeMap.removeLayer(activeUserMarker);
       activeUserMarker = L.marker([lat, lng], { icon: USER_ICON }).addTo(activeMap);
       activeUserMarker.bindTooltip("你的位置", { direction: "top" });
@@ -1141,7 +1223,7 @@ createApp({
       mapExpanded.value = true;
       await nextTick();
 
-      // 修正 2：等兩次 rAF 確保 .map-expanded 已實際排版
+      // 等兩次 rAF，確保 .map-expanded 已實際排版
       await new Promise((r) => requestAnimationFrame(() => r()));
       await new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -1151,26 +1233,24 @@ createApp({
         return;
       }
 
-      // 首次展開：建立地圖
       if (!mapMobile) {
         mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
         L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
         L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
       }
 
-      // 切換 activeMap
       activeMap = mapMobile;
 
-      // 讓瀏覽器完成繪製後再讓 Leaflet 量尺寸
+      // 讓 Leaflet 量尺寸後再繪製
       await new Promise((r) => setTimeout(r, 120));
       mapMobile.invalidateSize();
       drawOnActiveMap();
 
-      // 若已有選中站，飛過去；否則 fitBounds
-      if (selectedStop.value) {
-        focusMapOnStop(selectedStop.value);
-      } else if (activeRouteLine) {
-        mapMobile.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
+      // 展開後捲動到地圖頂端
+      await nextTick();
+      const mapEl = document.querySelector(".map-expanded");
+      if (mapEl) {
+        mapEl.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }
 
@@ -1187,15 +1267,6 @@ createApp({
       if (mapDesktop && window.matchMedia("(min-width: 901px)").matches) {
         activeMap = mapDesktop;
         nextTick(drawOnActiveMap);
-      }
-    });
-
-    watch(mapExpanded, (val) => {
-      if (!val && mapDesktop) {
-        // 收合時切回桌面地圖（桌面上不影響）
-        if (window.matchMedia("(min-width: 901px)").matches) {
-          activeMap = mapDesktop;
-        }
       }
     });
 
@@ -1228,9 +1299,9 @@ createApp({
       companies, company, routeInput, lastSearched, searched,
       allRoutes, matchedRoutes, routeKey, stops, selectedStop, etas, dataAge,
       loadingStops, error, statusText, showDebug, stopListRef,
-      mapExpanded, mapRowText,
+      mapExpanded, mapRowText, pickingDirection,
       onCompanyChange, onSearch, selectDirection, onStopClick,
-      expandMap, zoomIn, zoomOut,
+      expandMap, zoomIn, zoomOut, toggleDirectionPicker,
       formatMinutes, formatDistance,
     };
   },
