@@ -143,7 +143,7 @@
   h3 { margin: 0 0 8px; font-size: 14px; }
   h3 small { color: #666; font-weight: normal; font-size: 12px; }
 
-  /* ============ 方向列（新） ============ */
+  /* 方向列 */
   .direction-row {
     display: flex;
     align-items: center;
@@ -175,7 +175,6 @@
   .direction-chip:hover { background: #dbe9ff; }
   .direction-chip .arrow { margin: 0 4px; }
 
-  /* 展開的方向選擇清單 */
   .direction-picker {
     list-style: none;
     padding: 0;
@@ -257,8 +256,7 @@
     flex-shrink: 0;
     transition: background 0.15s;
   }
-  .search-btn:hover:not(:disabled) { background: #2c5aa0; }
-  .search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .search-btn:hover { background: #2c5aa0; }
 
   .main-area {
     display: grid;
@@ -307,7 +305,6 @@
     align-items: center;
     justify-content: center;
     user-select: none;
-    transition: background 0.15s, transform 0.1s;
   }
   .map-zoom-btn:hover { background: #eaf1ff; }
   .map-zoom-btn:active { transform: scale(0.94); background: #dbe9ff; }
@@ -393,9 +390,6 @@
     100% { transform: scale(1); }
   }
 
-  /* =========================================================
-     MOBILE ONLY  (<= 900px)
-     ========================================================= */
   @media (max-width: 900px) {
     .layout {
       grid-template-columns: 1fr;
@@ -403,9 +397,7 @@
       gap: 8px;
       padding: 8px;
     }
-
     .main-area { display: contents; }
-
     .map-wrap-desktop { display: none !important; }
 
     .map-row-mobile {
@@ -419,9 +411,7 @@
       cursor: pointer;
       margin-bottom: 8px;
       user-select: none;
-      transition: background 0.15s;
     }
-    .map-row-mobile:hover { background: #eef4ff; }
     .map-row-mobile .pin { font-size: 18px; flex-shrink: 0; }
     .map-row-mobile .text {
       flex: 1;
@@ -495,43 +485,32 @@
           v-model.trim="routeInput"
           placeholder="例：1、968、A21"
           @keyup.enter="onSearch" />
-        <button
-          class="search-btn"
-          :disabled="!routeInput || !allRoutes.length"
-          @click="onSearch">
-          查詢
-        </button>
+        <button class="search-btn" @click="onSearch">查詢</button>
       </div>
 
-      <!-- ============ 地圖列（mobile only） ============ -->
-      <div v-if="!mapExpanded"
-           class="map-row-mobile"
-           @click="expandMap">
+      <div class="status">狀態：{{ statusText }}</div>
+
+      <div v-if="!mapExpanded" class="map-row-mobile" @click="expandMap">
         <span class="pin">📍</span>
         <span class="text">{{ mapRowText }}</span>
         <span class="hint-tap">點擊放大地圖</span>
       </div>
 
-      <!-- ============ 展開的地圖（mobile only） ============ -->
       <div v-show="mapExpanded" class="map-expanded panel">
         <div id="map-mobile"></div>
         <div class="map-zoom-controls">
-          <button class="map-zoom-btn" @click.stop="zoomIn" aria-label="放大">+</button>
-          <button class="map-zoom-btn" @click.stop="zoomOut" aria-label="縮小">−</button>
+          <button class="map-zoom-btn" @click.stop="zoomIn">+</button>
+          <button class="map-zoom-btn" @click.stop="zoomOut">−</button>
         </div>
       </div>
 
-      <!-- ============ 方向列（新） ============ -->
       <div v-if="selectedRoute" class="direction-row">
         <span class="label">方向</span>
-        <div class="direction-chip"
-             @click="toggleDirectionPicker"
-             :title="'點擊重新選擇方向'">
+        <div class="direction-chip" @click="toggleDirectionPicker">
           {{ selectedRoute.orig_tc }}<span class="arrow">→</span>{{ selectedRoute.dest_tc }}
         </div>
       </div>
 
-      <!-- 展開的方向選擇清單 -->
       <ul v-if="pickingDirection && matchedRoutes.length" class="direction-picker">
         <li v-for="r in matchedRoutes"
             :key="r.key"
@@ -540,6 +519,10 @@
           <span>{{ r.orig_tc }} <span class="arrow">→</span> {{ r.dest_tc }}</span>
         </li>
       </ul>
+
+      <div v-if="matchedRoutes.length && !selectedRoute" class="hint">
+        請選擇方向
+      </div>
 
       <div v-else-if="searched && !matchedRoutes.length" class="hint">
         找不到路線「{{ lastSearched }}」
@@ -568,8 +551,8 @@
       <div class="panel map-wrap map-wrap-desktop">
         <div id="map-desktop"></div>
         <div class="map-zoom-controls">
-          <button class="map-zoom-btn" @click.stop="zoomIn" aria-label="放大">+</button>
-          <button class="map-zoom-btn" @click.stop="zoomOut" aria-label="縮小">−</button>
+          <button class="map-zoom-btn" @click.stop="zoomIn">+</button>
+          <button class="map-zoom-btn" @click.stop="zoomOut">−</button>
         </div>
       </div>
 
@@ -607,6 +590,9 @@
 <script>
 const { createApp, ref, computed, onMounted, onUnmounted, nextTick, watch } = Vue;
 
+/* =========================================================
+   Debug 記錄
+   ========================================================= */
 function dbg(msg, cls = "info") {
   const time = new Date().toLocaleTimeString();
   const el = document.getElementById("debug-panel");
@@ -632,17 +618,15 @@ const KMB_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 
 async function getJSON(url) {
-  dbg("→ " + url);
   const t0 = performance.now();
   const res = await fetch(url);
   const ms = Math.round(performance.now() - t0);
   if (!res.ok) {
-    dbg(`  ✗ HTTP ${res.status} (${ms}ms)`, "err");
+    dbg(`✗ HTTP ${res.status} (${ms}ms) ${url}`, "err");
     throw new Error("HTTP " + res.status);
   }
-  const json = await res.json();
-  dbg(`  ✓ OK (${ms}ms)`, "ok");
-  return json;
+  dbg(`✓ OK (${ms}ms)`, "ok");
+  return res.json();
 }
 
 function toApiDirection(bound) {
@@ -748,7 +732,6 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-/* 檢查座標是否有效，避免 Leaflet NaN 錯誤 */
 function isValidCoord(lat, lng) {
   return (
     typeof lat === "number" && typeof lng === "number" &&
@@ -760,7 +743,7 @@ function isValidCoord(lat, lng) {
 }
 
 /* =========================================================
-   巴士標記 SVG
+   巴士標記
    ========================================================= */
 function busPinSvg({ pinColor, pulse, scale }) {
   const pinW = 32 * scale, pinH = 40 * scale;
@@ -807,14 +790,13 @@ const BUS_PIN_SELECTED = L.divIcon({
 
 const USER_ICON = L.divIcon({
   className: "user-marker",
-  html: `
-    <div style="
-      width:22px;height:22px;
-      background:#2196f3;
-      border:3px solid white;
-      border-radius:50%;
-      box-shadow:0 0 0 4px rgba(33,150,243,0.25), 0 2px 6px rgba(0,0,0,0.35);
-    "></div>`,
+  html: `<div style="
+    width:22px;height:22px;
+    background:#2196f3;
+    border:3px solid white;
+    border-radius:50%;
+    box-shadow:0 0 0 4px rgba(33,150,243,0.25), 0 2px 6px rgba(0,0,0,0.35);
+  "></div>`,
   iconSize: [22, 22],
   iconAnchor: [11, 11],
 });
@@ -825,38 +807,15 @@ const USER_ICON = L.divIcon({
 createApp({
   setup() {
     const companies = [
-      {
-        id: "KMB", name: "九巴",
-        logo: "data:image/svg+xml;utf8," + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
-            <rect width="100" height="60" fill="#ffffff"/>
-            <text x="50" y="42" font-family="Arial Black, Arial, sans-serif"
-                  font-size="34" font-weight="900" fill="#e30613"
-                  text-anchor="middle">KMB</text>
-          </svg>`),
-      },
-      {
-        id: "CTB", name: "城巴",
-        logo: "data:image/svg+xml;utf8," + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
-            <rect width="100" height="60" fill="#ffd400"/>
-            <circle cx="50" cy="24" r="16" fill="#e30613"/>
-            <polygon points="58,10 26,24 58,38 46,24" fill="#ffd400"/>
-            <text x="50" y="52" font-family="Arial, sans-serif"
-                  font-size="10" font-weight="700" fill="#1565c0"
-                  text-anchor="middle">城巴Citybus</text>
-          </svg>`),
-      },
-      {
-        id: "LWB", name: "龍運",
-        logo: "data:image/svg+xml;utf8," + encodeURIComponent(`
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
-            <rect width="100" height="60" fill="#ffffff"/>
-            <text x="50" y="42" font-family="Arial Black, Arial, sans-serif"
-                  font-size="34" font-weight="900" fill="#ff6600"
-                  text-anchor="middle">LWB</text>
-          </svg>`),
-      },
+      { id: "KMB", name: "九巴",
+        logo: "data:image/svg+xml;utf8," + encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><rect width="100" height="60" fill="#ffffff"/><text x="50" y="42" font-family="Arial Black, Arial, sans-serif" font-size="34" font-weight="900" fill="#e30613" text-anchor="middle">KMB</text></svg>`) },
+      { id: "CTB", name: "城巴",
+        logo: "data:image/svg+xml;utf8," + encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><rect width="100" height="60" fill="#ffd400"/><circle cx="50" cy="24" r="16" fill="#e30613"/><polygon points="58,10 26,24 58,38 46,24" fill="#ffd400"/><text x="50" y="52" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#1565c0" text-anchor="middle">城巴Citybus</text></svg>`) },
+      { id: "LWB", name: "龍運",
+        logo: "data:image/svg+xml;utf8," + encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><rect width="100" height="60" fill="#ffffff"/><text x="50" y="42" font-family="Arial Black, Arial, sans-serif" font-size="34" font-weight="900" fill="#ff6600" text-anchor="middle">LWB</text></svg>`) },
     ];
 
     const company = ref("KMB");
@@ -927,6 +886,7 @@ createApp({
       } catch (e) {
         error.value = "無法載入路線清單：" + e.message;
         statusText.value = "路線清單載入失敗";
+        dbg("loadRoutes 失敗：" + e.message, "err");
       }
     }
 
@@ -937,31 +897,41 @@ createApp({
     }
 
     function onSearch() {
-      const q = (routeInput.value || "").trim();
-      if (!q) return;
-      lastSearched.value = q.toUpperCase();
-      searched.value = true;
-      routeKey.value = "";
-      stops.value = [];
-      selectedStop.value = null;
-      etas.value = [];
-      dataAge.value = null;
-      error.value = "";
-      mapExpanded.value = false;
+      try {
+        const q = (routeInput.value || "").trim();
+        if (!q) {
+          statusText.value = "請輸入路線號碼";
+          return;
+        }
+        if (!allRoutes.value.length) {
+          statusText.value = "路線清單尚未載入完成，請稍候再試";
+          return;
+        }
 
-      const count = matchedRoutes.value.length;
-      if (count === 0) {
-        statusText.value = `找不到路線「${q}」`;
+        lastSearched.value = q.toUpperCase();
+        searched.value = true;
+        routeKey.value = "";
+        stops.value = [];
+        selectedStop.value = null;
+        etas.value = [];
+        dataAge.value = null;
+        error.value = "";
+        mapExpanded.value = false;
         pickingDirection.value = false;
-      } else if (count === 1) {
-        // 只有一個方向：自動選取，不顯示方向列
-        statusText.value = `找到 1 個方向`;
-        pickingDirection.value = false;
-        selectDirection(matchedRoutes.value[0]);
-      } else {
-        // 多個方向：顯示方向列讓使用者點擊
-        statusText.value = `找到 ${count} 個方向`;
-        pickingDirection.value = false;
+
+        const count = matchedRoutes.value.length;
+        if (count === 0) {
+          statusText.value = `找不到路線「${q}」`;
+        } else if (count === 1) {
+          statusText.value = `找到 1 個方向`;
+          selectDirection(matchedRoutes.value[0]);
+        } else {
+          statusText.value = `找到 ${count} 個方向`;
+        }
+        dbg(`查詢 ${q}：找到 ${count} 個方向`, "info");
+      } catch (err) {
+        dbg("onSearch 錯誤：" + err.message, "err");
+        statusText.value = "查詢失敗：" + err.message;
       }
     }
 
@@ -987,10 +957,7 @@ createApp({
           const seq = await fetchCitybusRouteStops(r.route, r.direction);
           detailed = await Promise.all(seq.map(s => fetchCitybusStop(s.stopId)));
         }
-        // 過濾掉座標無效的站，避免 Leaflet NaN 錯誤
         const validStops = detailed.filter(s => isValidCoord(s.lat, s.lng));
-        const dropped = detailed.length - validStops.length;
-        if (dropped > 0) dbg(`略過 ${dropped} 個無效座標的站`, "info");
         stops.value = validStops;
         statusText.value = `路線 ${r.route} 共 ${validStops.length} 個站`;
 
@@ -1002,14 +969,12 @@ createApp({
         await autoLocateNearestStop();
       } catch (e) {
         error.value = "無法載入巴士站：" + e.message;
+        dbg("selectDirection 失敗：" + e.message, "err");
       } finally {
         loadingStops.value = false;
       }
     }
 
-    /* =========================================================
-       定位
-       ========================================================= */
     function getUserPosition() {
       return new Promise((resolve, reject) => {
         if (!("geolocation" in navigator)) {
@@ -1054,9 +1019,7 @@ createApp({
         statusText.value = `最近車站：${nearest.name}（${formatDistance(minDist)}）`;
         await applySelection(nearest);
       } catch (e) {
-        // 去掉技術錯誤訊息，只顯示人性化的提示
-        const msg = e.message || "定位失敗";
-        const clean = msg.replace(/\(.*?\)/g, "").trim(); // 移除括號內的技術細節
+        const clean = (e.message || "定位失敗").replace(/\(.*?\)/g, "").trim();
         statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站（${clean}）`;
       }
     }
@@ -1067,18 +1030,11 @@ createApp({
       return (meters / 1000).toFixed(1) + " km";
     }
 
-    /* =========================================================
-       選中巴士站
-       ========================================================= */
     async function applySelection(stop) {
       selectedStop.value = stop;
-
-      // 手機版：如果地圖是展開的，選站後自動收合；展開時則不動作
       if (mapExpanded.value) mapExpanded.value = false;
-
       await nextTick();
       await scrollSelectedIntoView(stop);
-
       if (activeMap) focusMapOnStop(stop);
       await refreshEta();
     }
@@ -1088,7 +1044,6 @@ createApp({
       if (!container) return;
       const el = container.querySelector(`[data-stop-id="${stop.id}"]`);
       if (!el) return;
-
       await new Promise((r) => requestAnimationFrame(() => r()));
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       await new Promise((r) => setTimeout(r, 250));
@@ -1160,7 +1115,6 @@ createApp({
       activeMarkers = [];
       if (!stops.value.length) return;
 
-      // 只保留有有效座標的站
       const drawable = stops.value.filter(s => isValidCoord(s.lat, s.lng));
       if (!drawable.length) return;
 
@@ -1188,9 +1142,7 @@ createApp({
       } else {
         try {
           activeMap.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
-        } catch (e) {
-          // 忽略
-        }
+        } catch (e) { /* ignore */ }
       }
     }
 
@@ -1211,19 +1163,14 @@ createApp({
       activeUserMarker.bindTooltip("你的位置", { direction: "top" });
     }
 
-    /* =========================================================
-       展開 / 收合 mobile 地圖
-       ========================================================= */
     async function expandMap() {
       if (!stops.value.length) {
         statusText.value = "請先選擇路線及方向";
         return;
       }
-
       mapExpanded.value = true;
       await nextTick();
 
-      // 等兩次 rAF，確保 .map-expanded 已實際排版
       await new Promise((r) => requestAnimationFrame(() => r()));
       await new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -1241,17 +1188,13 @@ createApp({
 
       activeMap = mapMobile;
 
-      // 讓 Leaflet 量尺寸後再繪製
       await new Promise((r) => setTimeout(r, 120));
       mapMobile.invalidateSize();
       drawOnActiveMap();
 
-      // 展開後捲動到地圖頂端
       await nextTick();
       const mapEl = document.querySelector(".map-expanded");
-      if (mapEl) {
-        mapEl.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      if (mapEl) mapEl.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function zoomIn() {
@@ -1271,8 +1214,8 @@ createApp({
     });
 
     function handleResize() {
-      mapDesktop && mapDesktop.invalidateSize();
-      mapMobile && mapMobile.invalidateSize();
+      if (mapDesktop) mapDesktop.invalidateSize();
+      if (mapMobile) mapMobile.invalidateSize();
       if (!window.matchMedia("(max-width: 900px)").matches && mapExpanded.value) {
         mapExpanded.value = false;
       }
@@ -1287,6 +1230,7 @@ createApp({
       window.addEventListener("resize", handleResize);
       timer = setInterval(() => { if (selectedStop.value) refreshEta(); }, 30000);
       ageTimer = setInterval(() => { if (dataAge.value !== null) dataAge.value += 1; }, 1000);
+      dbg("應用已啟動", "ok");
     });
 
     onUnmounted(() => {
