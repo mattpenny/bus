@@ -83,39 +83,24 @@
   h3 { margin: 0 0 8px; font-size: 14px; }
   h3 small { color: #666; font-weight: normal; font-size: 12px; }
 
-  /* ============ 方向列：label 與 chip 同一行 ============ */
   .direction-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
   }
   .direction-row .label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #333;
-    flex-shrink: 0;
+    font-size: 14px; font-weight: 600; color: #333; flex-shrink: 0;
   }
   .direction-chip {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid #1a3d7c;
-    border-radius: 8px;
-    background: #eaf1ff;
-    color: #1a3d7c;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    flex: 1; padding: 8px 12px;
+    border: 1px solid #1a3d7c; border-radius: 8px;
+    background: #eaf1ff; color: #1a3d7c;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    text-align: center; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
     transition: background 0.15s;
   }
   .direction-chip:hover { background: #dbe9ff; }
   .direction-chip:active { background: #c8dcff; }
 
-  /* 方向清單（未選方向 / 點 chip 重選時） */
   .direction-picker { list-style: none; padding: 0; margin: 0 0 8px; }
   .direction-picker li {
     padding: 9px 11px; border: 1px solid #dde;
@@ -197,7 +182,6 @@
   .map-zoom-btn:active { transform: scale(0.94); background: #dbe9ff; }
 
   .map-row-mobile { display: none; }
-  .map-expanded { display: none; }
 
   .eta-box {
     padding: 10px 14px; max-height: 200px;
@@ -257,6 +241,9 @@
     100% { transform: scale(1); }
   }
 
+  /* =========================================================
+     MOBILE 地圖浮層（全螢幕 overlay）
+     ========================================================= */
   @media (max-width: 900px) {
     .layout {
       grid-template-columns: 1fr;
@@ -279,12 +266,6 @@
     }
     .map-row-mobile .hint-tap { font-size: 11px; color: #888; flex-shrink: 0; }
 
-    .map-expanded {
-      display: block; width: 100%; height: 45vh;
-      border-radius: 10px; overflow: hidden;
-      margin-bottom: 8px; padding: 0; position: relative;
-    }
-
     .eta-box { max-height: 160px; padding: 8px 12px; }
     .eta-box .time { font-size: 18px; }
     .eta-box .rank { width: 55px; font-size: 11px; }
@@ -295,7 +276,94 @@
 
   @media (min-width: 901px) {
     .map-row-mobile { display: none !important; }
-    .map-expanded { display: none !important; }
+  }
+
+  /* 全螢幕地圖浮層：僅在 mobile 使用 */
+  .map-overlay { display: none; }
+  @media (max-width: 900px) {
+    .map-overlay {
+      display: flex;
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      background: rgba(0, 0, 0, 0.55);
+      flex-direction: column;
+      padding: 10px;
+      padding-top: max(10px, env(safe-area-inset-top));
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      animation: overlayFadeIn 0.18s ease-out;
+    }
+
+    .map-overlay-inner {
+      flex: 1;
+      min-height: 0;
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .map-overlay-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #1a3d7c;
+      color: white;
+      flex-shrink: 0;
+      gap: 10px;
+    }
+    .map-overlay-header .title {
+      font-size: 14px;
+      font-weight: 600;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .map-overlay-header .close-btn {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(255,255,255,0.18);
+      color: white;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .map-overlay-header .close-btn:hover {
+      background: rgba(255,255,255,0.32);
+    }
+
+    .map-overlay .map-body {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    .map-overlay #map-mobile {
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+    }
+
+    /* overlay 內的縮放按鈕位置 */
+    .map-overlay .map-zoom-controls {
+      top: 12px;
+      left: 12px;
+    }
+  }
+
+  @keyframes overlayFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 </style>
 </head>
@@ -333,28 +401,13 @@
       <div class="status">狀態：{{ statusText }}</div>
 
       <!-- 地圖列（mobile only） -->
-      <div v-if="!mapExpanded" class="map-row-mobile" @click="expandMap">
+      <div class="map-row-mobile" @click="expandMap">
         <span class="pin">📍</span>
         <span class="text">{{ mapRowText }}</span>
         <span class="hint-tap">點擊放大地圖</span>
       </div>
 
-      <!-- 展開的地圖（mobile only） -->
-      <div v-show="mapExpanded" class="map-expanded panel">
-        <div id="map-mobile"></div>
-        <div class="map-zoom-controls">
-          <button class="map-zoom-btn" @click.stop="zoomIn">+</button>
-          <button class="map-zoom-btn" @click.stop="zoomOut">−</button>
-        </div>
-      </div>
-
-      <!-- =========================================================
-           方向區塊
-           未選方向 / 點 chip 重選 → 顯示清單
-           已選方向 → 顯示 chip（方向 label 與 chip 同一行）
-           ========================================================= -->
-
-      <!-- 尚未選方向，或正在重選：顯示清單 -->
+      <!-- 方向區塊 -->
       <div v-if="!selectedDirectionLabel || pickingDirection">
         <div v-if="matchedRoutes.length > 1" class="direction-row">
           <span class="label">方向</span>
@@ -369,7 +422,6 @@
         </ul>
       </div>
 
-      <!-- 已選方向：顯示 chip -->
       <div v-else class="direction-row">
         <span class="label">方向</span>
         <div class="direction-chip" @click="clearDirection">
@@ -377,7 +429,6 @@
         </div>
       </div>
 
-      <!-- 找不到路線 -->
       <div v-if="searched && !matchedRoutes.length" class="hint">
         找不到路線「{{ lastSearched }}」
       </div>
@@ -435,6 +486,25 @@
       </div>
     </main>
   </div>
+
+  <!-- 全螢幕地圖浮層（mobile only） -->
+  <Teleport to="body">
+    <div v-if="mapExpanded" class="map-overlay" @click.self="collapseMap">
+      <div class="map-overlay-inner">
+        <div class="map-overlay-header">
+          <span class="title">📍 {{ mapRowText }}</span>
+          <button class="close-btn" @click="collapseMap" aria-label="關閉">✕</button>
+        </div>
+        <div class="map-body">
+          <div id="map-mobile"></div>
+          <div class="map-zoom-controls">
+            <button class="map-zoom-btn" @click.stop="zoomIn">+</button>
+            <button class="map-zoom-btn" @click.stop="zoomOut">−</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 
   <div class="debug-toggle" @click="showDebug = !showDebug">🐞</div>
   <div id="debug-panel" :class="{ show: showDebug }"></div>
@@ -711,6 +781,11 @@ createApp({
       return "請先選擇路線及方向";
     });
 
+    function findCurrentRoute() {
+      return matchedRoutes.value.find(r => r.key === routeKey.value) || null;
+    }
+    const selectedRoute = computed(() => findCurrentRoute());
+
     async function loadRoutes() {
       error.value = "";
       routeKey.value = "";
@@ -753,15 +828,11 @@ createApp({
     function onSearch() {
       try {
         const q = (routeInput.value || "").trim();
-        if (!q) {
-          statusText.value = "請輸入路線號碼";
-          return;
-        }
+        if (!q) { statusText.value = "請輸入路線號碼"; return; }
         if (!allRoutes.value.length) {
           statusText.value = "路線清單尚未載入完成，請稍候再試";
           return;
         }
-
         lastSearched.value = q.toUpperCase();
         searched.value = true;
         routeKey.value = "";
@@ -790,7 +861,6 @@ createApp({
       }
     }
 
-    /* 點 chip → 清除目前選擇，重新顯示方向清單 */
     function clearDirection() {
       routeKey.value = "";
       selectedDirectionLabel.value = "";
@@ -881,10 +951,7 @@ createApp({
         for (const s of stops.value) {
           if (!isValidCoord(s.lat, s.lng)) continue;
           s.distance = haversineMeters(me.lat, me.lng, s.lat, s.lng);
-          if (s.distance < minDist) {
-            minDist = s.distance;
-            nearest = s;
-          }
+          if (s.distance < minDist) { minDist = s.distance; nearest = s; }
         }
         if (!nearest) {
           statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站`;
@@ -911,6 +978,7 @@ createApp({
     async function applySelection(stop) {
       if (!stop || !isValidCoord(stop.lat, stop.lng)) return;
       selectedStop.value = stop;
+      // 關閉 mobile 地圖浮層
       if (mapExpanded.value) mapExpanded.value = false;
       await nextTick();
       await scrollSelectedIntoView(stop);
@@ -957,12 +1025,6 @@ createApp({
         error.value = "無法取得 ETA：" + e.message;
       }
     }
-
-    /* 從 matchedRoutes 找目前選中的方向 */
-    function findCurrentRoute() {
-      return matchedRoutes.value.find(r => r.key === routeKey.value) || null;
-    }
-    const selectedRoute = computed(() => findCurrentRoute());
 
     function formatMinutes(m) {
       if (m === null || m === undefined) return "—";
@@ -1060,7 +1122,7 @@ createApp({
       }
       mapExpanded.value = true;
       await nextTick();
-
+      // 等兩個 rAF，讓 overlay 的 flex 容器算出高度
       await new Promise((r) => requestAnimationFrame(() => r()));
       await new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -1074,6 +1136,14 @@ createApp({
         mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
         L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
         L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
+      } else {
+        // 容器已被 overlay 重建，把 map 掛回新的 DOM 節點
+        if (mapMobile.getContainer() !== container) {
+          mapMobile.remove();
+          mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
+          L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
+          L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
+        }
       }
 
       activeMap = mapMobile;
@@ -1082,9 +1152,22 @@ createApp({
       mapMobile.invalidateSize();
       drawOnActiveMap();
 
-      await nextTick();
-      const mapEl = document.querySelector(".map-expanded");
-      if (mapEl) mapEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      // 若有選中站，聚焦它；否則 fitBounds
+      if (selectedStop.value) {
+        focusMapOnStop(selectedStop.value);
+      } else if (activeRouteLine) {
+        try {
+          mapMobile.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    function collapseMap() {
+      mapExpanded.value = false;
+      // 把 activeMap 切回桌面版
+      if (window.matchMedia("(min-width: 901px)").matches && mapDesktop) {
+        activeMap = mapDesktop;
+      }
     }
 
     function zoomIn() {
@@ -1135,7 +1218,7 @@ createApp({
       loadingStops, error, statusText, showDebug, stopListRef,
       mapExpanded, mapRowText, pickingDirection, selectedDirectionLabel,
       onCompanyChange, onSearch, selectDirection, onStopClick,
-      expandMap, zoomIn, zoomOut, clearDirection,
+      expandMap, collapseMap, zoomIn, zoomOut, clearDirection,
       formatMinutes, formatDistance,
     };
   },
