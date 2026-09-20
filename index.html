@@ -62,15 +62,6 @@
     overflow: hidden;
   }
 
-  @media (max-width: 900px) {
-    .layout {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-      gap: 8px;
-      padding: 8px;
-    }
-  }
-
   .panel {
     background: white;
     border-radius: 10px;
@@ -239,10 +230,6 @@
     overflow: hidden;
   }
 
-  @media (max-width: 900px) {
-    .main-area { grid-template-rows: 1fr auto; gap: 8px; }
-  }
-
   #map { width: 100%; height: 100%; min-height: 200px; border-radius: 10px; }
 
   .map-wrap {
@@ -253,6 +240,72 @@
     position: relative;
   }
 
+  /* ============ 地圖上的 +/- 按鈕 ============ */
+  .map-zoom-controls {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .map-zoom-btn {
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 10px;
+    background: white;
+    color: #1a3d7c;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .map-zoom-btn:hover { background: #eaf1ff; }
+  .map-zoom-btn:active { transform: scale(0.94); background: #dbe9ff; }
+
+  /* ============ 地圖收合列（mobile only） ============ */
+  .map-row-mobile {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid #dde;
+    border-radius: 8px;
+    background: #f8faff;
+    cursor: pointer;
+    margin-bottom: 8px;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .map-row-mobile:hover { background: #eef4ff; }
+  .map-row-mobile .pin {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .map-row-mobile .text {
+    flex: 1;
+    font-size: 13px;
+    color: #333;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .map-row-mobile .hint-tap {
+    font-size: 11px;
+    color: #888;
+    flex-shrink: 0;
+  }
+
+  /* ============ ETA 面板 ============ */
   .eta-box {
     padding: 10px 14px;
     max-height: 200px;
@@ -302,17 +355,6 @@
     50%      { opacity: 0.35; }
   }
 
-  @media (max-width: 600px) {
-    .eta-box { max-height: 160px; padding: 8px 12px; }
-    .eta-box .time { font-size: 18px; }
-    .eta-box .rank { width: 55px; font-size: 11px; }
-  }
-
-  @media (max-width: 900px) {
-    .sidebar { max-height: 38vh; }
-    .stop-list { max-height: 100px; }
-  }
-
   .debug-toggle {
     position: fixed; bottom: 10px; right: 10px;
     background: #333; color: #0f0;
@@ -341,6 +383,53 @@
     50%  { transform: scale(1.15); }
     100% { transform: scale(1); }
   }
+
+  /* =========================================================
+     MOBILE ONLY  (<= 900px)
+     ========================================================= */
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;       /* 全部內容放進單欄，地圖不是獨立格 */
+      gap: 8px;
+      padding: 8px;
+    }
+
+    .main-area {
+      display: contents;             /* 拆掉 grid wrapper，讓子元素直接排入 layout */
+    }
+
+    /* 桌面地圖在 mobile 隱藏（改由內嵌地圖取代） */
+    .map-wrap-desktop { display: none; }
+
+    /* 收合列：只在 mobile 顯示 */
+    .map-row-mobile { display: flex; }
+
+    /* 展開時的地圖容器 */
+    .map-expanded {
+      display: block;
+      width: 100%;
+      height: 45vh;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 8px;
+      padding: 0;
+    }
+
+    /* ETA 面板在 mobile 的調整 */
+    .eta-box { max-height: 160px; padding: 8px 12px; }
+    .eta-box .time { font-size: 18px; }
+    .eta-box .rank { width: 55px; font-size: 11px; }
+
+    .sidebar { max-height: none; overflow: visible; }
+    .stop-list { max-height: none; }
+  }
+
+  /* 收合狀態：方向列表與站點正常顯示 */
+  .map-expanded { display: none; }
+  @media (min-width: 901px) {
+    .map-expanded { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -353,6 +442,7 @@
 
   <div class="layout">
     <aside class="panel sidebar">
+
       <div class="company-label">巴士公司</div>
       <div class="company-row">
         <button
@@ -383,6 +473,25 @@
       </div>
 
       <div class="status">{{ statusText }}</div>
+
+      <!-- ============ 收合的「地圖列」（mobile only） ============ -->
+      <div v-if="!mapExpanded"
+           class="map-row-mobile"
+           @click="expandMap">
+        <span class="pin">📍</span>
+        <span class="text">{{ mapRowText }}</span>
+        <span class="hint-tap">點擊放大地圖</span>
+      </div>
+
+      <!-- ============ 展開的地圖（mobile only） ============ -->
+      <div v-if="mapExpanded" class="map-expanded panel">
+        <div id="map"></div>
+        <!-- +/- 按鈕 -->
+        <div class="map-zoom-controls">
+          <button class="map-zoom-btn" @click.stop="zoomIn" aria-label="放大">+</button>
+          <button class="map-zoom-btn" @click.stop="zoomOut" aria-label="縮小">−</button>
+        </div>
+      </div>
 
       <div v-if="matchedRoutes.length">
         <h3>方向</h3>
@@ -417,8 +526,13 @@
     </aside>
 
     <main class="main-area">
-      <div class="panel map-wrap">
-        <div id="map"></div>
+      <!-- 桌面地圖（> 900px 顯示） -->
+      <div class="panel map-wrap map-wrap-desktop">
+        <div id="map-desktop"></div>
+        <div class="map-zoom-controls">
+          <button class="map-zoom-btn" @click.stop="zoomIn" aria-label="放大">+</button>
+          <button class="map-zoom-btn" @click.stop="zoomOut" aria-label="縮小">−</button>
+        </div>
       </div>
 
       <div class="panel eta-box">
@@ -712,7 +826,9 @@ createApp({
     const showDebug = ref(false);
     const stopListRef = ref(null);
 
-    /* 修正：不再 sort，保持 API 原始順序（outbound 在上、inbound 在下） */
+    /* mobile 地圖收合狀態 */
+    const mapExpanded = ref(false);
+
     const matchedRoutes = computed(() => {
       if (!searched.value) return [];
       const q = lastSearched.value.toUpperCase();
@@ -729,6 +845,13 @@ createApp({
       () => matchedRoutes.value.find(r => r.key === routeKey.value) || null
     );
 
+    /* 收合列顯示的文字：目前選中的站名 */
+    const mapRowText = computed(() => {
+      if (selectedStop.value) return selectedStop.value.name;
+      if (stops.value.length) return "點擊查看路線地圖";
+      return "請先選擇路線及方向";
+    });
+
     async function loadRoutes() {
       error.value = "";
       routeKey.value = "";
@@ -738,6 +861,7 @@ createApp({
       dataAge.value = null;
       allRoutes.value = [];
       searched.value = false;
+      mapExpanded.value = false;
       statusText.value = "載入路線清單中…";
       try {
         let list = [];
@@ -775,6 +899,7 @@ createApp({
       etas.value = [];
       dataAge.value = null;
       error.value = "";
+      mapExpanded.value = false;
       const count = matchedRoutes.value.length;
       statusText.value = count === 0
         ? `找不到路線「${q}」`
@@ -798,7 +923,6 @@ createApp({
           const seq = await fetchCitybusRouteStops(r.route, r.direction);
           detailed = await Promise.all(seq.map(s => fetchCitybusStop(s.stopId)));
         }
-        // 修正：不再 reverse，保持起點在頂、終點在底
         stops.value = detailed;
         statusText.value = `路線 ${r.route} 共 ${stops.value.length} 個站`;
         await autoLocateNearestStop();
@@ -874,14 +998,25 @@ createApp({
       return (meters / 1000).toFixed(1) + " km";
     }
 
+    /* =========================================================
+       點擊巴士站：收合地圖（mobile only），更新 ETA
+       ========================================================= */
     async function onStopClick(stop) {
       selectedStop.value = stop;
+
+      // mobile：選站後自動收合地圖
+      mapExpanded.value = false;
+
       await nextTick();
+      // 地圖可能因為 v-if 被重建，重繪地圖
+      rebuildActiveMap();
+
       const container = stopListRef.value;
       if (container) {
         const el = container.querySelector(`[data-stop-id="${stop.id}"]`);
         if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
+
       focusMapOnStop(stop);
       await refreshEta();
     }
@@ -912,67 +1047,149 @@ createApp({
       return m + " 分鐘";
     }
 
-    /* ---------- 地圖 ---------- */
-    let map = null;
-    let markers = [];
-    let routeLine = null;
-    let userMarker = null;
+    /* =========================================================
+       地圖管理（支援 desktop 與 mobile 兩個容器）
+       ========================================================= */
+    let mapDesktop = null;   // 桌面版
+    let mapMobile = null;    // mobile 展開版
+    let activeMarkers = [];
+    let activeRouteLine = null;
+    let activeUserMarker = null;
+    let activeMap = null;    // 指向目前使用中的地圖實例
 
-    function initMap() {
-      map = L.map("map", { zoomControl: true }).setView(HK_CENTER, HK_ZOOM);
-      L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(map);
-      L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(map);
-      window.addEventListener("resize", () => map && map.invalidateSize());
+    function createMapOn(containerId) {
+      const el = document.getElementById(containerId);
+      if (!el) return null;
+      const m = L.map(el, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
+      L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(m);
+      L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(m);
+      return m;
     }
 
-    function showUserMarker(lat, lng) {
-      if (!map) return;
-      if (userMarker) map.removeLayer(userMarker);
-      userMarker = L.marker([lat, lng], { icon: USER_ICON }).addTo(map);
-      userMarker.bindTooltip("你的位置", { direction: "top" });
+    function initMaps() {
+      mapDesktop = createMapOn("map-desktop");
+      // mobile 地圖在展開時才建立（容器尚未存在）
+      window.addEventListener("resize", () => {
+        mapDesktop && mapDesktop.invalidateSize();
+        mapMobile   && mapMobile.invalidateSize();
+      });
     }
 
-    function redrawMap() {
-      if (!map) return;
-      markers.forEach(({ marker }) => map.removeLayer(marker));
-      if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-      markers = [];
+    /* mobile 展開地圖 */
+    async function expandMap() {
+      if (!stops.value.length) {
+        statusText.value = "請先選擇路線及方向";
+        return;
+      }
+      mapExpanded.value = true;
+      await nextTick();
+      // 建立或重建 mobile 地圖
+      if (!mapMobile) {
+        mapMobile = createMapOn("map");
+      }
+      activeMap = mapMobile;
+      drawOnActiveMap();
+      // Leaflet 需要視窗重繪後才知道容器尺寸
+      setTimeout(() => mapMobile.invalidateSize(), 100);
+      // 自動飛到選中站或路線起點
+      if (selectedStop.value) {
+        focusMapOnStop(selectedStop.value);
+      }
+    }
+
+    /* mobile 收合地圖 */
+    function collapseMap() {
+      mapExpanded.value = false;
+    }
+
+    /* 依目前環境決定要用哪張地圖 */
+    function pickActiveMap() {
+      const isMobile = window.matchMedia("(max-width: 900px)").matches;
+      if (isMobile) {
+        return mapExpanded.value ? mapMobile : null;
+      }
+      return mapDesktop;
+    }
+
+    function rebuildActiveMap() {
+      activeMap = pickActiveMap();
+      if (!activeMap) return;
+      drawOnActiveMap();
+    }
+
+    function drawOnActiveMap() {
+      if (!activeMap) return;
+      // 清掉舊的
+      activeMarkers.forEach(({ marker }) => activeMap.removeLayer(marker));
+      if (activeRouteLine) { activeMap.removeLayer(activeRouteLine); activeRouteLine = null; }
+      activeMarkers = [];
+
       if (!stops.value.length) return;
 
       stops.value.forEach(s => {
-        const marker = L.marker([s.lat, s.lng], { icon: BUS_PIN_DEFAULT }).addTo(map);
+        const marker = L.marker([s.lat, s.lng], { icon: BUS_PIN_DEFAULT }).addTo(activeMap);
         marker.bindTooltip(s.name, { direction: "top", offset: [0, -26] });
         marker.on("click", () => onStopClick(s));
-        markers.push({ marker, stop: s });
+        activeMarkers.push({ marker, stop: s });
       });
 
-      routeLine = L.polyline(
+      activeRouteLine = L.polyline(
         stops.value.map(s => [s.lat, s.lng]),
         { color: "#1a3d7c", weight: 3, opacity: 0.55, dashArray: "6,6" }
-      ).addTo(map);
+      ).addTo(activeMap);
 
-      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
-      setTimeout(() => map.invalidateSize(), 100);
+      activeMap.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
+    }
+
+    function showUserMarker(lat, lng) {
+      if (!activeMap) return;
+      if (activeUserMarker) activeMap.removeLayer(activeUserMarker);
+      activeUserMarker = L.marker([lat, lng], { icon: USER_ICON }).addTo(activeMap);
+      activeUserMarker.bindTooltip("你的位置", { direction: "top" });
     }
 
     function focusMapOnStop(stop) {
-      if (!map) return;
-      markers.forEach(({ marker, stop: s }) => {
+      if (!activeMap) return;
+      activeMarkers.forEach(({ marker, stop: s }) => {
         marker.setIcon(s.id === stop.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
         marker.setZIndexOffset(s.id === stop.id ? 1000 : 0);
       });
-      const targetZoom = Math.max(map.getZoom(), 15);
-      map.flyTo([stop.lat, stop.lng], targetZoom, { duration: 0.6 });
+      const targetZoom = Math.max(activeMap.getZoom(), 15);
+      activeMap.flyTo([stop.lat, stop.lng], targetZoom, { duration: 0.6 });
     }
 
-    watch(stops, () => nextTick(redrawMap));
+    /* 地圖放大 / 縮小 */
+    function zoomIn() {
+      if (activeMap) activeMap.zoomIn();
+      else if (mapDesktop && window.matchMedia("(min-width: 901px)").matches) mapDesktop.zoomIn();
+    }
+    function zoomOut() {
+      if (activeMap) activeMap.zoomOut();
+      else if (mapDesktop && window.matchMedia("(min-width: 901px)").matches) mapDesktop.zoomOut();
+    }
+
+    /* 當 stops 改變時重繪當前地圖 */
+    watch(stops, () => {
+      activeMap = pickActiveMap();
+      if (activeMap) nextTick(drawOnActiveMap);
+    });
+
+    /* 監聽視窗尺寸變化：桌機 / 手機切換時，切換地圖 */
+    function handleResize() {
+      mapDesktop && mapDesktop.invalidateSize();
+      mapMobile   && mapMobile.invalidateSize();
+      activeMap = pickActiveMap();
+      if (activeMap) drawOnActiveMap();
+    }
 
     let timer = null;
     let ageTimer = null;
 
     onMounted(() => {
-      initMap();
+      initMaps();
+      activeMap = mapDesktop;
       loadRoutes();
+      window.addEventListener("resize", handleResize);
       timer = setInterval(() => { if (selectedStop.value) refreshEta(); }, 30000);
       ageTimer = setInterval(() => { if (dataAge.value !== null) dataAge.value += 1; }, 1000);
     });
@@ -980,13 +1197,16 @@ createApp({
     onUnmounted(() => {
       clearInterval(timer);
       clearInterval(ageTimer);
+      window.removeEventListener("resize", handleResize);
     });
 
     return {
       companies, company, routeInput, lastSearched, searched,
       allRoutes, matchedRoutes, routeKey, stops, selectedStop, etas, dataAge,
       loadingStops, error, statusText, showDebug, stopListRef,
+      mapExpanded, mapRowText,
       onCompanyChange, onSearch, selectDirection, onStopClick,
+      expandMap, collapseMap, zoomIn, zoomOut,
       formatMinutes, formatDistance,
     };
   },
