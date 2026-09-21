@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
 <meta charset="UTF-8" />
@@ -486,6 +486,12 @@
     color: #c0392b;
   }
 
+  /* === 地圖圖示（取代「點擊放大地圖」文字） === */
+  .map-row-mobile .map-icon {
+    width: 22px; height: 22px; flex-shrink: 0;
+    display: block;
+  }
+
   @media (max-width: 900px) {
     .layout {
       grid-template-columns: minmax(0, 1fr);
@@ -517,9 +523,6 @@
       flex: 1 1 0; min-width: 0;
       font-size: calc(13px * var(--font-scale)); color: #333; font-weight: 600;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .map-row-mobile .hint-tap {
-      font-size: calc(11px * var(--font-scale)); color: #888; flex-shrink: 0;
     }
 
     .eta-box { max-height: 220px; padding: 8px 12px; }
@@ -725,7 +728,12 @@
       <div class="map-row-mobile" @click="expandMap">
         <span class="pin">📍</span>
         <span class="text">{{ mapRowText }}</span>
-        <span class="hint-tap">點擊放大地圖</span>
+        <svg class="map-icon" viewBox="0 0 24 24" fill="none" stroke="#1a3d7c" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6" fill="#eaf1ff"/>
+          <line x1="8" y1="3" x2="8" y2="18"/>
+          <line x1="16" y1="6" x2="16" y2="21"/>
+        </svg>
       </div>
 
       <div v-if="!selectedDirectionLabel || pickingDirection">
@@ -1793,8 +1801,9 @@ createApp({
       if (isMapUsable(mapDesktop)) activeMap = mapDesktop;
     }
 
-    /* 建立／更新站名標籤（永久顯示） */
+    /* 建立站名標籤專用 pane（避免與標記重疊） */
     function buildLabelLayer(map) {
+      if (!map) return;
       const labelPane = map.createPane("stopLabelPane");
       labelPane.style.zIndex = 650;
       labelPane.style.pointerEvents = "none";
@@ -1819,7 +1828,7 @@ createApp({
 
         drawable.forEach(s => {
           const marker = L.marker(s._ll, { icon: BUS_PIN_DEFAULT }).addTo(activeMap);
-          marker.bindTooltip(s.name, { direction: "top", offset: [0, -26] });
+          /* 已移除滑鼠移入顯示站名的 tooltip */
           marker.on("click", () => onStopClick(s));
           activeMarkers.push({ marker, stop: s });
 
