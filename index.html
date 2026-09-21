@@ -11,21 +11,27 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; }
   body {
     font-family: -apple-system, "PingFang HK", "Microsoft JhengHei", sans-serif;
     background: #f5f7fb; color: #222;
   }
-  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+  #app {
+    display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;
+    min-width: 0; max-width: 100%;
+  }
 
   header.app-header {
     background: #1a3d7c; color: white; padding: 10px 16px;
     flex-shrink: 0; display: flex; align-items: center;
     justify-content: space-between; gap: 12px;
+    min-width: 0;
   }
   header.app-header h1 {
     margin: 0; font-size: 17px; white-space: nowrap;
-    display: flex; align-items: center; gap: 9px; min-width: 0;
+    display: flex; align-items: center; gap: 9px;
+    min-width: 0; overflow: hidden;
   }
   header.app-header .header-logo-badge {
     width: 34px; height: 34px; flex-shrink: 0;
@@ -37,7 +43,7 @@
     width: 24px; height: 24px; flex-shrink: 0;
     object-fit: contain; display: block;
   }
-  header.app-header p { margin: 0; font-size: 11px; opacity: 0.75; }
+  header.app-header p { margin: 0; font-size: 11px; opacity: 0.75; flex-shrink: 0; }
   @media (max-width: 600px) {
     header.app-header { padding: 8px 12px; }
     header.app-header h1 { font-size: 15px; }
@@ -46,145 +52,116 @@
     header.app-header p { display: none; }
   }
 
+  /* =========================================================
+     Layout：關鍵修正
+     - 使用 minmax(0, ...) 讓 grid track 可以縮到比內容更窄
+     - 為 grid item 加上 min-width: 0
+     ========================================================= */
   .layout {
-    flex: 1; min-height: 0;
-    display: grid; grid-template-columns: 340px 1fr;
-    gap: 12px; padding: 12px; max-width: 1400px;
-    width: 100%; margin: 0 auto; overflow: hidden;
+    flex: 1; min-height: 0; min-width: 0;
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 12px; padding: 12px;
+    max-width: 1400px; width: 100%;
+    margin: 0 auto; overflow: hidden;
   }
 
   .panel {
     background: white; border-radius: 10px; padding: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     display: flex; flex-direction: column;
-    min-height: 0; overflow: hidden;
+    min-height: 0; min-width: 0;
+    overflow: hidden;
   }
-  .sidebar { overflow-y: auto; }
+  .sidebar {
+    overflow-y: auto; overflow-x: hidden;
+    min-width: 0;
+  }
 
   /* =========================================================
      我的最愛
      ========================================================= */
-  .fav-section { margin-bottom: 14px; }
+  .fav-section { margin-bottom: 14px; min-width: 0; }
   .fav-section .title {
-    font-size: 13px;
-    color: #333;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    font-size: 13px; color: #333; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
   }
   .fav-section .title .star { color: #f9a825; font-size: 14px; }
   .fav-slots {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
   .fav-slot {
     position: relative;
-    padding: 8px 6px;
-    border: 2px dashed #ccd;
-    border-radius: 10px;
-    background: #fafbff;
-    cursor: pointer;
-    min-height: 72px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    transition: all 0.15s;
-    overflow: visible;
-    text-align: center;
+    padding: 8px 4px;
+    border: 2px dashed #ccd; border-radius: 10px;
+    background: #fafbff; cursor: pointer;
+    min-height: 72px; min-width: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px; transition: all 0.15s;
+    overflow: visible; text-align: center;
   }
   .fav-slot.empty { color: #aaa; }
-  .fav-slot.empty:active {
-    background: #f0f6ff;
-    border-color: #9db5e0;
-  }
+  .fav-slot.empty:active { background: #f0f6ff; border-color: #9db5e0; }
   .fav-slot.filled {
-    border-style: solid;
-    border-color: #1a3d7c;
-    background: #eaf1ff;
-    color: #1a3d7c;
+    border-style: solid; border-color: #1a3d7c;
+    background: #eaf1ff; color: #1a3d7c;
   }
-  .fav-slot.filled:active {
-    background: #dbe9ff;
-    transform: scale(0.97);
-  }
+  .fav-slot.filled:active { background: #dbe9ff; transform: scale(0.97); }
   .fav-slot .fav-route {
-    font-size: 17px;
-    font-weight: 800;
-    line-height: 1;
+    font-size: 16px; font-weight: 800; line-height: 1;
     letter-spacing: -0.3px;
+    max-width: 100%; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
   }
   .fav-slot .fav-company {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    padding: 1px 5px;
-    border-radius: 8px;
-    background: rgba(26,61,124,0.12);
-    color: #1a3d7c;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+    padding: 1px 5px; border-radius: 8px;
+    background: rgba(26,61,124,0.12); color: #1a3d7c;
+    max-width: 100%; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
   }
   .fav-slot .fav-dest {
-    font-size: 9.5px;
-    font-weight: 500;
-    line-height: 1.15;
-    color: #555;
-    max-width: 100%;
-    overflow: hidden;
+    font-size: 9.5px; font-weight: 500;
+    line-height: 1.15; color: #555;
+    max-width: 100%; overflow: hidden;
     text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
+    display: -webkit-box; -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     word-break: break-word;
   }
-  .fav-slot .fav-plus {
-    font-size: 22px;
-    line-height: 1;
-    color: #1a3d7c;
-    opacity: 0.5;
-  }
-  .fav-slot .fav-hint {
-    font-size: 10px;
-    color: #999;
-  }
+  .fav-slot .fav-plus { font-size: 22px; line-height: 1; color: #1a3d7c; opacity: 0.5; }
+  .fav-slot .fav-hint { font-size: 10px; color: #999; }
   .fav-slot .fav-remove {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 2px solid white;
-    background: #e53935;
-    color: white;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1;
-    padding: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.25);
-    z-index: 2;
+    position: absolute; top: -6px; right: -6px;
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid white; background: #e53935; color: white;
+    font-size: 12px; font-weight: 700; line-height: 1;
+    padding: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.25); z-index: 2;
   }
   .fav-slot .fav-remove:active { background: #c62828; }
 
-  .fav-divider {
-    border: none;
-    border-top: 1px solid #eef;
-    margin: 12px 0;
-  }
+  .fav-divider { border: none; border-top: 1px solid #eef; margin: 12px 0; }
 
   /* =========================================================
      一般欄位
      ========================================================= */
-  .row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
-  .row label { font-size: 13px; color: #333; min-width: 60px; flex-shrink: 0; }
+  .row {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 10px; min-width: 0;
+  }
+  .row label {
+    font-size: 13px; color: #333;
+    min-width: 60px; flex-shrink: 0;
+  }
   input[type="text"] {
-    flex: 1; min-width: 0; padding: 8px 10px;
+    flex: 1 1 0;
+    min-width: 0; width: 0;
+    padding: 8px 10px;
     border: 1px solid #ccd; border-radius: 6px;
     font-size: 14px; background: white;
   }
@@ -192,7 +169,8 @@
 
   .company-label { font-size: 13px; color: #333; margin-bottom: 6px; }
   .company-row {
-    display: grid; grid-template-columns: repeat(3, 1fr);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px; margin-bottom: 12px;
   }
   .company-btn {
@@ -201,6 +179,7 @@
     border: 2px solid #dde; border-radius: 8px;
     background: white; cursor: pointer;
     transition: all 0.15s; position: relative;
+    min-width: 0;
   }
   .company-btn:hover { background: #f5f8ff; border-color: #9db5e0; }
   .company-btn.active {
@@ -221,13 +200,14 @@
   h3 small { color: #666; font-weight: normal; font-size: 12px; }
 
   .direction-row {
-    display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 8px; min-width: 0;
   }
   .direction-row .label {
     font-size: 14px; font-weight: 600; color: #333; flex-shrink: 0;
   }
   .direction-chip {
-    flex: 1; min-width: 0;
+    flex: 1 1 0; min-width: 0;
     padding: 8px 12px;
     border: 1px solid #1a3d7c; border-radius: 8px;
     background: #eaf1ff; color: #1a3d7c;
@@ -241,21 +221,15 @@
 
   .fav-btn {
     padding: 8px 10px;
-    border: 1px solid #1a3d7c;
-    border-radius: 8px;
-    background: white;
-    color: #1a3d7c;
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-    flex-shrink: 0;
+    border: 1px solid #1a3d7c; border-radius: 8px;
+    background: white; color: #1a3d7c;
+    font-size: 18px; line-height: 1;
+    cursor: pointer; flex-shrink: 0;
     transition: all 0.15s;
   }
   .fav-btn:hover { background: #eaf1ff; }
   .fav-btn.active {
-    background: #ffd54f;
-    border-color: #f9a825;
-    color: #f57f17;
+    background: #ffd54f; border-color: #f9a825; color: #f57f17;
   }
 
   .direction-picker { list-style: none; padding: 0; margin: 0 0 8px; }
@@ -265,15 +239,21 @@
     cursor: pointer; font-size: 13px;
     display: flex; justify-content: space-between;
     align-items: center; gap: 6px; background: white;
+    min-width: 0;
   }
   .direction-picker li:hover { background: #f0f6ff; }
   .direction-picker li.active {
     background: #dbe9ff; border-color: #1a3d7c; font-weight: 600;
   }
+  .direction-picker li span:first-child {
+    min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
   .direction-picker li .arrow { color: #1a3d7c; font-weight: bold; }
 
   .stop-list {
-    flex: 1; min-height: 80px; overflow-y: auto;
+    flex: 1; min-height: 80px; min-width: 0;
+    overflow-y: auto; overflow-x: hidden;
     border-top: 1px solid #eef; margin-top: 4px;
     -webkit-overflow-scrolling: touch;
   }
@@ -284,11 +264,16 @@
     transition: background 0.15s;
     display: flex; justify-content: space-between;
     align-items: center; gap: 6px;
+    min-width: 0;
   }
   .stop-list li:hover { background: #f0f6ff; }
   .stop-list li.active {
     background: #ffe0e0; color: #c0392b; font-weight: 700;
     border-left: 4px solid #e53935; padding-left: 6px;
+  }
+  .stop-list li > span:first-child {
+    min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
   }
   .stop-list .distance {
     font-size: 11px; color: #27ae60; background: #e8f8ee;
@@ -297,9 +282,9 @@
   }
   .stop-list li.active .distance { background: #ffd5d5; color: #c0392b; }
 
-  .status { font-size: 11px; color: #888; margin: 4px 0 8px; }
-  .hint { color: #999; font-size: 13px; padding: 6px 0; }
-  .error { color: #c0392b; font-size: 12px; margin-top: 6px; }
+  .status { font-size: 11px; color: #888; margin: 4px 0 8px; word-break: break-word; }
+  .hint { color: #999; font-size: 13px; padding: 6px 0; word-break: break-word; }
+  .error { color: #c0392b; font-size: 12px; margin-top: 6px; word-break: break-word; }
   .loading { color: #1a3d7c; font-size: 12px; padding: 4px 0; }
 
   .search-btn {
@@ -312,7 +297,8 @@
 
   .main-area {
     display: grid; grid-template-rows: 1fr auto;
-    gap: 12px; min-height: 0; overflow: hidden;
+    gap: 12px; min-height: 0; min-width: 0;
+    overflow: hidden;
   }
 
   #map-desktop, #map-mobile {
@@ -342,18 +328,23 @@
 
   .eta-box {
     padding: 10px 14px; max-height: 200px;
-    overflow-y: auto; flex-shrink: 0;
+    overflow-y: auto; flex-shrink: 0; min-width: 0;
   }
   .eta-box h3 { margin-bottom: 6px; }
   .eta-box ul { list-style: none; padding: 0; margin: 0; }
   .eta-box li {
     display: flex; align-items: center; gap: 12px;
     padding: 7px 0; border-bottom: 1px dashed #eee;
+    min-width: 0;
   }
   .eta-box li:last-child { border-bottom: none; }
   .eta-box .rank { width: 65px; color: #555; font-size: 12px; flex-shrink: 0; }
-  .eta-box .time { font-size: 20px; font-weight: 700; color: #1a3d7c; }
-  .eta-box .remark { font-size: 12px; color: #e67e22; margin-left: auto; }
+  .eta-box .time { font-size: 20px; font-weight: 700; color: #1a3d7c; flex-shrink: 0; }
+  .eta-box .remark {
+    font-size: 12px; color: #e67e22; margin-left: auto;
+    min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
 
   .eta-box .age-line { border-bottom: none; padding: 0 0 4px 0; margin-top: -2px; }
   .eta-box .age { font-size: 11px; color: #888; }
@@ -398,40 +389,81 @@
     100% { transform: scale(1); }
   }
 
+  /* =========================================================
+     MOBILE ONLY
+     ========================================================= */
   @media (max-width: 900px) {
     .layout {
-      grid-template-columns: 1fr;
-      grid-template-rows: 1fr;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
       gap: 8px; padding: 8px;
     }
     .main-area { display: contents; }
     .map-wrap-desktop { display: none !important; }
 
+    .panel {
+      padding: 10px;
+      min-width: 0; max-width: 100%;
+    }
+
+    .sidebar {
+      max-width: 100%; min-width: 0;
+      max-height: none; overflow: visible;
+    }
+
     .map-row-mobile {
       display: flex; align-items: center; gap: 8px;
       padding: 10px; border: 1px solid #dde;
       border-radius: 8px; background: #f8faff;
-      cursor: pointer; margin-bottom: 8px; user-select: none;
+      cursor: pointer; margin-bottom: 8px;
+      user-select: none; min-width: 0;
     }
     .map-row-mobile .pin { font-size: 18px; flex-shrink: 0; }
     .map-row-mobile .text {
-      flex: 1; font-size: 13px; color: #333; font-weight: 600;
+      flex: 1 1 0; min-width: 0;
+      font-size: 13px; color: #333; font-weight: 600;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .map-row-mobile .hint-tap { font-size: 11px; color: #888; flex-shrink: 0; }
+    .map-row-mobile .hint-tap {
+      font-size: 11px; color: #888; flex-shrink: 0;
+    }
 
     .eta-box { max-height: 160px; padding: 8px 12px; }
     .eta-box .time { font-size: 18px; }
     .eta-box .rank { width: 55px; font-size: 11px; }
 
-    .sidebar { max-height: none; overflow: visible; }
     .stop-list { max-height: 60vh; }
+
+    /* 手機專用：加大觸控目標、避免 iOS 聚焦縮放 */
+    .row label { min-width: 60px; }
+    .row input[type="text"] {
+      font-size: 16px; padding: 10px 12px;
+      flex: 1 1 0; min-width: 0; width: 0;
+    }
+    .row .search-btn {
+      padding: 11px 14px; font-size: 14px; border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    /* 更窄的手機 (≤ 380px) */
+    @media (max-width: 380px) {
+      .layout { padding: 6px; gap: 6px; }
+      .panel { padding: 8px; }
+      .row label { min-width: 50px; font-size: 12px; }
+      .row .search-btn { padding: 10px 10px; font-size: 13px; }
+      .fav-slot .fav-route { font-size: 14px; }
+      .fav-slot .fav-dest { font-size: 9px; }
+      .company-sheet .company-btn img { height: 36px; max-width: 74px; }
+    }
   }
 
   @media (min-width: 901px) {
     .map-row-mobile { display: none !important; }
   }
 
+  /* =========================================================
+     Overlays
+     ========================================================= */
   .map-overlay { display: none; }
   @media (max-width: 900px) {
     .map-overlay {
@@ -459,8 +491,9 @@
       flex-shrink: 0; gap: 10px;
     }
     .map-overlay-header .title {
-      font-size: 14px; font-weight: 600; flex: 1;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 14px; font-weight: 600; flex: 1 1 0;
+      min-width: 0; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
     }
     .map-overlay-header .close-btn {
       flex-shrink: 0; width: 34px; height: 34px;
@@ -470,20 +503,12 @@
       display: flex; align-items: center; justify-content: center;
     }
     .map-overlay-header .close-btn:hover { background: rgba(255,255,255,0.32); }
-    .map-overlay .map-body {
-      flex: 1; min-height: 0; position: relative;
-    }
-    .map-overlay #map-mobile {
-      width: 100%; height: 100%; border-radius: 0;
-    }
+    .map-overlay .map-body { flex: 1; min-height: 0; position: relative; }
+    .map-overlay #map-mobile { width: 100%; height: 100%; border-radius: 0; }
     .map-overlay .map-zoom-controls { top: 12px; left: 12px; }
   }
 
-  /* =========================================================
-     巴士公司選擇彈窗（mobile only）
-     ========================================================= */
   .company-overlay { display: none; }
-
   @media (max-width: 900px) {
     .company-overlay {
       display: flex;
@@ -491,8 +516,7 @@
       inset: 0;
       z-index: 3500;
       background: rgba(0, 0, 0, 0.55);
-      align-items: center;
-      justify-content: center;
+      align-items: center; justify-content: center;
       padding: 20px;
       padding-bottom: max(20px, env(safe-area-inset-bottom));
       animation: overlayFadeIn 0.18s ease-out;
@@ -527,10 +551,6 @@
       margin-top: 10px; text-align: center;
       font-size: 11px; color: #888;
     }
-
-    .row label { min-width: 64px; }
-    .row input[type="text"] { font-size: 16px; padding: 11px 12px; }
-    .row .search-btn { padding: 12px 18px; font-size: 14px; border-radius: 8px; }
   }
 
   @keyframes overlayFadeIn {
@@ -555,7 +575,6 @@
   <div class="layout">
     <aside class="panel sidebar">
 
-      <!-- 我的最愛 -->
       <div class="fav-section">
         <div class="title"><span class="star">⭐</span>我的最愛</div>
         <div class="fav-slots">
@@ -971,9 +990,7 @@ const USER_ICON = L.divIcon({
 });
 
 /* =========================================================
-   最愛儲存（雙層備援）
-   localStorage（主要）+ cookie（備援）
-   兩者同時寫入，讀取時選較完整的一份
+   最愛儲存（雙層備援：localStorage + cookie）
    ========================================================= */
 const FAV_STORAGE_KEY = "hk-bus-eta-favourites";
 const FAV_COOKIE_DAYS = 365;
@@ -1041,7 +1058,6 @@ function loadFavouritesFromStorage() {
   }
   if (!best) return [null, null, null];
 
-  // 同步另一邊
   const json = JSON.stringify(best);
   if (best === fromCookie && !fromLS) {
     try { localStorage.setItem(FAV_STORAGE_KEY, json); } catch (e) {}
@@ -1667,7 +1683,6 @@ createApp({
       }
     }
 
-    /* 離開或背景時再存一次（保險） */
     function saveFavouritesOnExit() {
       try { saveFavourites(); } catch (e) {}
     }
@@ -1679,7 +1694,6 @@ createApp({
       initMaps();
       loadRoutes();
       window.addEventListener("resize", handleResize);
-      // 當 App 進入背景或即將關閉時，強制再存一次最愛
       window.addEventListener("beforeunload", saveFavouritesOnExit);
       window.addEventListener("pagehide", saveFavouritesOnExit);
       document.addEventListener("visibilitychange", () => {
