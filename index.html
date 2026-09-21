@@ -315,11 +315,48 @@
 
   .map-row-mobile { display: none; }
 
+  /* ETA 面板 */
   .eta-box {
-    padding: 10px 14px; max-height: 200px;
+    padding: 10px 14px; max-height: 220px;
     overflow-y: auto; flex-shrink: 0; min-width: 0;
   }
-  .eta-box h3 { margin-bottom: 6px; }
+  .eta-header {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 8px;
+    margin-bottom: 6px; min-width: 0;
+  }
+  .eta-header h3 {
+    margin: 0; min-width: 0;
+    display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap;
+  }
+  .eta-header h3 small {
+    color: #666; font-weight: normal; font-size: 12px;
+    min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .refresh-btn {
+    padding: 6px 10px;
+    border: 1px solid #ccd; border-radius: 6px;
+    background: white;
+    color: #1a3d7c;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 4px;
+    transition: all 0.15s;
+  }
+  .refresh-btn:hover { background: #eaf1ff; border-color: #1a3d7c; }
+  .refresh-btn:active { transform: scale(0.96); }
+  .refresh-btn.spinning .icon { animation: spin 1s linear infinite; }
+  .refresh-btn .icon { display: inline-block; font-size: 14px; line-height: 1; }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
   .eta-box ul { list-style: none; padding: 0; margin: 0; }
   .eta-box li {
     display: flex; align-items: center; gap: 12px;
@@ -335,8 +372,30 @@
     text-overflow: ellipsis; white-space: nowrap;
   }
 
-  .eta-box .age-line { border-bottom: none; padding: 0 0 4px 0; margin-top: -2px; }
-  .eta-box .age { font-size: 11px; color: #888; }
+  .eta-box .age-line {
+    border-bottom: none;
+    padding: 6px 0 0 0;
+    margin-top: 4px;
+    border-top: 1px solid #f0f0f0;
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 8px;
+    flex-wrap: wrap;
+  }
+  .eta-box .age {
+    font-size: 11px; color: #888;
+    display: flex; align-items: center;
+  }
+  .eta-box .countdown {
+    font-size: 11px; color: #1a3d7c;
+    display: flex; align-items: center; gap: 4px;
+    font-weight: 600;
+  }
+  .eta-box .countdown .num {
+    display: inline-block;
+    min-width: 24px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
   .eta-box .stale { color: #e67e22; font-weight: 600; margin-left: 6px; }
   .eta-box .fresh-dot {
     display: inline-block; width: 6px; height: 6px;
@@ -415,9 +474,10 @@
       font-size: 11px; color: #888; flex-shrink: 0;
     }
 
-    .eta-box { max-height: 160px; padding: 8px 12px; }
+    .eta-box { max-height: 220px; padding: 8px 12px; }
     .eta-box .time { font-size: 18px; }
     .eta-box .rank { width: 55px; font-size: 11px; }
+    .eta-header h3 small { font-size: 11px; }
 
     .stop-list { max-height: 60vh; }
 
@@ -678,10 +738,22 @@
       </div>
 
       <div class="panel eta-box">
-        <h3>
-          最近三班候車時間
-          <small v-if="selectedStop">— {{ selectedStop.name }}</small>
-        </h3>
+        <div class="eta-header">
+          <h3>
+            最近三班候車時間
+            <small v-if="selectedStop">— {{ selectedStop.name }}</small>
+          </h3>
+          <button v-if="selectedStop"
+                  class="refresh-btn"
+                  :class="{ spinning: refreshing }"
+                  :disabled="refreshing"
+                  @click="manualRefresh"
+                  title="立即更新">
+            <span class="icon">⟳</span>
+            <span>{{ refreshing ? '更新中' : '更新' }}</span>
+          </button>
+        </div>
+
         <div v-if="!selectedStop" class="hint">請先選擇巴士站</div>
         <ul v-else>
           <li v-for="(e, i) in etas" :key="i">
@@ -690,15 +762,20 @@
             <span class="remark" v-if="e.remark">{{ e.remark }}</span>
           </li>
 
-          <li v-if="etas.length && dataAge !== null" class="age-line">
+          <li v-if="!etas.length" class="hint" style="justify-content:center;">暫無班次資料</li>
+
+          <li v-if="etas.length || dataAge !== null" class="age-line">
             <span class="age">
               <span :class="dataAge > 90 ? 'stale-dot' : 'fresh-dot'"></span>
-              資料更新於 {{ dataAge }} 秒前
-              <span v-if="dataAge > 90" class="stale">⚠ 可能延遲</span>
+              <template v-if="refreshing">更新中…</template>
+              <template v-else-if="dataAge !== null">資料更新於 {{ dataAge }} 秒前</template>
+              <template v-else>已載入</template>
+              <span v-if="!refreshing && dataAge > 90" class="stale">⚠ 可能延遲</span>
+            </span>
+            <span v-if="countdown !== null && !refreshing" class="countdown">
+              下次更新 <span class="num">{{ countdown }}</span> 秒
             </span>
           </li>
-
-          <li v-if="!etas.length" class="hint" style="justify-content:center;">暫無班次資料</li>
         </ul>
       </div>
     </main>
@@ -923,7 +1000,6 @@ function isValidCoord(lat, lng) {
   );
 }
 
-/* 轉成 Leaflet 可用的 [lat, lng]，若不合法回傳 null */
 function safeLatLng(lat, lng) {
   const nLat = Number(lat);
   const nLng = Number(lng);
@@ -933,7 +1009,6 @@ function safeLatLng(lat, lng) {
   return [nLat, nLng];
 }
 
-/* 檢查地圖容器是否可見（有實際尺寸） */
 function isMapUsable(map) {
   if (!map) return false;
   try {
@@ -1083,6 +1158,11 @@ function loadFavouritesFromStorage() {
 }
 
 /* =========================================================
+   自動更新設定：每 30 秒更新一次
+   ========================================================= */
+const AUTO_REFRESH_INTERVAL = 30;
+
+/* =========================================================
    Vue App
    ========================================================= */
 createApp({
@@ -1110,6 +1190,8 @@ createApp({
     const selectedStop = ref(null);
     const etas = ref([]);
     const dataAge = ref(null);
+    const countdown = ref(null);
+    const refreshing = ref(false);
     const loadingStops = ref(false);
     const error = ref("");
     const statusText = ref("準備中…");
@@ -1134,8 +1216,6 @@ createApp({
       const ckOk = writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
       if (!lsOk && !ckOk) {
         dbg("⚠️ 最愛無法持久化儲存（localStorage 與 cookie 均失敗）", "err");
-      } else {
-        dbg(`最愛已儲存（LS:${lsOk ? "✓" : "✗"} Cookie:${ckOk ? "✓" : "✗"}）`, "ok");
       }
     }
 
@@ -1180,6 +1260,7 @@ createApp({
       selectedStop.value = null;
       etas.value = [];
       dataAge.value = null;
+      countdown.value = null;
       allRoutes.value = [];
       searched.value = false;
       mapExpanded.value = false;
@@ -1231,6 +1312,7 @@ createApp({
       selectedStop.value = null;
       etas.value = [];
       dataAge.value = null;
+      countdown.value = null;
       error.value = "";
       mapExpanded.value = false;
       pickingDirection.value = false;
@@ -1301,6 +1383,7 @@ createApp({
       selectedStop.value = null;
       etas.value = [];
       dataAge.value = null;
+      countdown.value = null;
       statusText.value = "請重新選擇方向";
     }
 
@@ -1314,6 +1397,7 @@ createApp({
       selectedStop.value = null;
       etas.value = [];
       dataAge.value = null;
+      countdown.value = null;
       try {
         let detailed = [];
         if (company.value === "KMB" || company.value === "LWB") {
@@ -1329,9 +1413,6 @@ createApp({
         stops.value = validStops;
         statusText.value = `路線 ${r.route} 共 ${validStops.length} 個站`;
 
-        // 只在「可見」的地圖上繪製
-        // - 桌面：mapDesktop（一定可見）
-        // - 手機：只有當地圖浮層已展開且 mapMobile 存在時
         const targetMap = isMobile.value
           ? (mapExpanded.value ? mapMobile : null)
           : mapDesktop;
@@ -1487,7 +1568,6 @@ createApp({
       if (mapExpanded.value) mapExpanded.value = false;
       await nextTick();
       await scrollSelectedIntoView(stop);
-      // 只在可見地圖上飛過去
       if (isMapUsable(activeMap)) focusMapOnStop(stop);
       await refreshEta();
     }
@@ -1511,11 +1591,19 @@ createApp({
       await applySelection(stop);
     }
 
-    async function refreshEta() {
+    /* =========================================================
+       ETA 更新（含自動倒數）
+       ========================================================= */
+    async function refreshEta(manual = false) {
       const stop = selectedStop.value;
       if (!stop) return;
       const r = findCurrentRoute();
       if (!r) return;
+
+      if (refreshing.value) return;
+      refreshing.value = true;
+      countdown.value = AUTO_REFRESH_INTERVAL;
+
       try {
         let result;
         if (company.value === "KMB" || company.value === "LWB") {
@@ -1525,11 +1613,22 @@ createApp({
         }
         etas.value = result.items;
         dataAge.value = result.ageSeconds;
+        if (manual) dbg("手動更新完成", "ok");
       } catch (e) {
         etas.value = [];
         dataAge.value = null;
         error.value = "無法取得 ETA：" + e.message;
+        dbgError("refreshEta", e);
+      } finally {
+        refreshing.value = false;
+        countdown.value = AUTO_REFRESH_INTERVAL;
       }
+    }
+
+    function manualRefresh() {
+      if (refreshing.value) return;
+      dbg("手動更新 ETA", "info");
+      refreshEta(true);
     }
 
     function formatMinutes(m) {
@@ -1561,17 +1660,13 @@ createApp({
     }
 
     function drawOnActiveMap() {
-      if (!isMapUsable(activeMap)) {
-        dbg("地圖不可用（容器尺寸為 0），跳過繪製", "info");
-        return;
-      }
+      if (!isMapUsable(activeMap)) return;
       try {
         activeMarkers.forEach(({ marker }) => activeMap.removeLayer(marker));
         if (activeRouteLine) { activeMap.removeLayer(activeRouteLine); activeRouteLine = null; }
         activeMarkers = [];
         if (!stops.value.length) return;
 
-        // 二次驗證：轉成 number 並檢查有效
         const drawable = [];
         for (const s of stops.value) {
           const ll = safeLatLng(s.lat, s.lng);
@@ -1683,7 +1778,6 @@ createApp({
       drawOnActiveMap();
 
       if (!isMapUsable(mapMobile)) {
-        dbg("手機地圖容器尺寸仍為 0，稍後重試", "info");
         setTimeout(() => {
           try { mapMobile.invalidateSize(); } catch (e) {}
           drawOnActiveMap();
@@ -1746,8 +1840,40 @@ createApp({
       try { saveFavourites(); } catch (e) {}
     }
 
-    let timer = null;
-    let ageTimer = null;
+    /* =========================================================
+       每 1 秒 tick：更新倒數 + 資料年齡
+       ========================================================= */
+    let tickTimer = null;
+
+    function tick() {
+      if (dataAge.value !== null && !refreshing.value) {
+        dataAge.value += 1;
+      }
+      if (!selectedStop.value) {
+        countdown.value = null;
+        return;
+      }
+      if (refreshing.value) return;
+      if (countdown.value === null) {
+        countdown.value = AUTO_REFRESH_INTERVAL;
+        return;
+      }
+      countdown.value -= 1;
+      if (countdown.value <= 0) {
+        countdown.value = AUTO_REFRESH_INTERVAL;
+        refreshEta();
+      }
+    }
+
+    function handleVisibility() {
+      if (document.visibilityState === "visible" && selectedStop.value) {
+        dbg("回到前景，立即更新 ETA", "info");
+        refreshEta();
+      }
+      if (document.visibilityState === "hidden") {
+        saveFavouritesOnExit();
+      }
+    }
 
     onMounted(() => {
       initMaps();
@@ -1755,25 +1881,25 @@ createApp({
       window.addEventListener("resize", handleResize);
       window.addEventListener("beforeunload", saveFavouritesOnExit);
       window.addEventListener("pagehide", saveFavouritesOnExit);
-      document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") saveFavouritesOnExit();
-      });
-      timer = setInterval(() => { if (selectedStop.value) refreshEta(); }, 30000);
-      ageTimer = setInterval(() => { if (dataAge.value !== null) dataAge.value += 1; }, 1000);
-      dbg("應用已啟動", "ok");
+      document.addEventListener("visibilitychange", handleVisibility);
+
+      tickTimer = setInterval(tick, 1000);
+
+      dbg(`應用已啟動（ETA 每 ${AUTO_REFRESH_INTERVAL} 秒自動更新）`, "ok");
     });
 
     onUnmounted(() => {
-      clearInterval(timer);
-      clearInterval(ageTimer);
+      clearInterval(tickTimer);
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("beforeunload", saveFavouritesOnExit);
       window.removeEventListener("pagehide", saveFavouritesOnExit);
+      document.removeEventListener("visibilitychange", handleVisibility);
     });
 
     return {
       companies, company, routeInput, lastSearched, searched,
-      allRoutes, matchedRoutes, routeKey, stops, selectedStop, etas, dataAge,
+      allRoutes, matchedRoutes, routeKey, stops, selectedStop, etas,
+      dataAge, countdown, refreshing,
       loadingStops, error, statusText, showDebug, stopListRef,
       mapExpanded, mapRowText, pickingDirection, selectedDirectionLabel,
       isMobile, showCompanyPicker,
@@ -1782,6 +1908,7 @@ createApp({
       selectDirection, onStopClick,
       expandMap, collapseMap, zoomIn, zoomOut, clearDirection,
       toggleFavourite, removeFavourite, onFavClick,
+      manualRefresh,
       formatMinutes, formatDistance,
     };
   },
