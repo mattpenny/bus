@@ -101,26 +101,27 @@
     min-width: 0;
   }
 
-  .fav-section { margin-bottom: 14px; min-width: 0; }
+  /* === 我的最愛：收窄上下留白 === */
+  .fav-section { margin-bottom: 8px; margin-top: 0; min-width: 0; }
   .fav-section .title {
-    font-size: calc(13px * var(--font-scale)); color: #333; margin-bottom: 6px;
+    font-size: calc(13px * var(--font-scale)); color: #333; margin-bottom: 4px;
     display: flex; align-items: center; gap: 6px;
   }
   .fav-section .title .star { color: #f9a825; font-size: calc(14px * var(--font-scale)); }
   .fav-slots {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    gap: 6px;
   }
   .fav-slot {
     position: relative;
-    padding: 8px 4px;
+    padding: 5px 4px;
     border: 2px dashed #ccd; border-radius: 10px;
     background: #fafbff; cursor: pointer;
-    min-height: 72px; min-width: 0;
+    min-height: 62px; min-width: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 3px; transition: all 0.15s;
+    gap: 2px; transition: all 0.15s;
     overflow: visible; text-align: center;
   }
   .fav-slot.empty { color: #aaa; }
@@ -165,7 +166,8 @@
   }
   .fav-slot .fav-remove:active { background: #c62828; }
 
-  .fav-divider { border: none; border-top: 1px solid #eef; margin: 12px 0; }
+  /* === 分隔線：上下留白收窄 === */
+  .fav-divider { border: none; border-top: 1px solid #eef; margin: 6px 0; }
 
   .row {
     display: flex; align-items: center; gap: 6px;
@@ -392,7 +394,15 @@
     min-width: 0;
   }
   .eta-box li:last-child { border-bottom: none; }
-  .eta-box .rank { width: 65px; color: #555; font-size: calc(12px * var(--font-scale)); flex-shrink: 0; }
+
+  /* === 第 N 班：字級與時間一致 === */
+  .eta-box .rank {
+    width: 78px;
+    color: #1a3d7c;
+    font-size: calc(20px * var(--font-scale));
+    font-weight: 700;
+    flex-shrink: 0;
+  }
   .eta-box .time {
     font-size: calc(20px * var(--font-scale)); font-weight: 700; color: #1a3d7c; flex-shrink: 0;
     display: flex; align-items: baseline; gap: 6px;
@@ -453,6 +463,29 @@
     100% { transform: scale(1); }
   }
 
+  /* === 地圖上巴士站名稱標籤 === */
+  .stop-name-label {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid #1a3d7c;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: calc(11px * var(--font-scale));
+    font-weight: 600;
+    color: #1a3d7c;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    pointer-events: none;
+    display: inline-block;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stop-name-label.selected {
+    background: #ffe0e0;
+    border-color: #e53935;
+    color: #c0392b;
+  }
+
   @media (max-width: 900px) {
     .layout {
       grid-template-columns: minmax(0, 1fr);
@@ -492,7 +525,7 @@
     .eta-box { max-height: 220px; padding: 8px 12px; }
     .eta-box .time { font-size: calc(18px * var(--font-scale)); }
     .eta-box .exact-time { font-size: calc(18px * var(--font-scale)); }
-    .eta-box .rank { width: 55px; font-size: calc(11px * var(--font-scale)); }
+    .eta-box .rank { width: 68px; font-size: calc(18px * var(--font-scale)); }
     .eta-header h3 small { font-size: calc(11px * var(--font-scale)); }
 
     .stop-list { max-height: 60vh; }
@@ -1153,6 +1186,17 @@ const USER_ICON = L.divIcon({
   iconAnchor: [11, 11],
 });
 
+/* 巴士站名稱標籤（永久顯示在地圖上） */
+function makeStopLabelIcon(name, selected) {
+  const safeName = String(name).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return L.divIcon({
+    className: "stop-name-label-wrap",
+    html: `<div class="stop-name-label${selected ? " selected" : ""}">${safeName}</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
 /* =========================================================
    最愛儲存（雙層備援）
    ========================================================= */
@@ -1730,6 +1774,7 @@ createApp({
     let mapMobile  = null;
     let activeMap  = null;
     let activeMarkers = [];
+    let activeLabels = [];
     let activeRouteLine = null;
     let activeUserMarker = null;
     let lastUserPos = null;
@@ -1748,12 +1793,21 @@ createApp({
       if (isMapUsable(mapDesktop)) activeMap = mapDesktop;
     }
 
+    /* 建立／更新站名標籤（永久顯示） */
+    function buildLabelLayer(map) {
+      const labelPane = map.createPane("stopLabelPane");
+      labelPane.style.zIndex = 650;
+      labelPane.style.pointerEvents = "none";
+    }
+
     function drawOnActiveMap() {
       if (!isMapUsable(activeMap)) return;
       try {
         activeMarkers.forEach(({ marker }) => activeMap.removeLayer(marker));
+        activeLabels.forEach(lbl => activeMap.removeLayer(lbl));
         if (activeRouteLine) { activeMap.removeLayer(activeRouteLine); activeRouteLine = null; }
         activeMarkers = [];
+        activeLabels = [];
         if (!stops.value.length) return;
 
         const drawable = [];
@@ -1768,6 +1822,15 @@ createApp({
           marker.bindTooltip(s.name, { direction: "top", offset: [0, -26] });
           marker.on("click", () => onStopClick(s));
           activeMarkers.push({ marker, stop: s });
+
+          /* 永久顯示站名標籤 */
+          const label = L.marker(s._ll, {
+            icon: makeStopLabelIcon(s.name, false),
+            interactive: false,
+            keyboard: false,
+            pane: "stopLabelPane",
+          }).addTo(activeMap);
+          activeLabels.push(label);
         });
 
         activeRouteLine = L.polyline(
@@ -1783,6 +1846,10 @@ createApp({
           activeMarkers.forEach(({ marker, stop: s }) => {
             marker.setIcon(s.id === selectedStop.value.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
             marker.setZIndexOffset(s.id === selectedStop.value.id ? 1000 : 0);
+          });
+          activeLabels.forEach((lbl, idx) => {
+            const s = drawable[idx];
+            lbl.setIcon(makeStopLabelIcon(s.name, s.id === selectedStop.value.id));
           });
           activeMap.setView(selLL, Math.max(activeMap.getZoom(), 15));
         } else {
@@ -1806,6 +1873,16 @@ createApp({
         activeMarkers.forEach(({ marker, stop: s }) => {
           marker.setIcon(s.id === stop.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
           marker.setZIndexOffset(s.id === stop.id ? 1000 : 0);
+        });
+        /* 更新標籤高亮狀態 */
+        activeLabels.forEach(lbl => {
+          const el = lbl.getElement();
+          if (!el) return;
+          const inner = el.querySelector(".stop-name-label");
+          if (inner) {
+            const isSel = inner.textContent === stop.name;
+            inner.classList.toggle("selected", isSel);
+          }
         });
         const targetZoom = Math.max(activeMap.getZoom(), 15);
         activeMap.flyTo(ll, targetZoom, { duration: 0.6 });
@@ -1846,11 +1923,15 @@ createApp({
           mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
           L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
           L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
+          buildLabelLayer(mapMobile);
         } else if (mapMobile.getContainer() !== container) {
           mapMobile.remove();
           mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
           L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
           L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
+          buildLabelLayer(mapMobile);
+        } else {
+          buildLabelLayer(mapMobile);
         }
       } catch (e) {
         dbgError("expandMap init", e);
@@ -1966,6 +2047,7 @@ createApp({
 
     onMounted(() => {
       initMaps();
+      if (mapDesktop) buildLabelLayer(mapDesktop);
       loadRoutes();
       window.addEventListener("resize", handleResize);
       window.addEventListener("beforeunload", saveFavouritesOnExit);
