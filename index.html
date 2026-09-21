@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>香港巴士預報系統</title>
+<title>Ansum Bus</title>
 <link rel="icon" type="image/png" href="bus.png" />
 <link rel="apple-touch-icon" href="bus.png" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
@@ -375,7 +375,13 @@
   }
   .eta-box li:last-child { border-bottom: none; }
   .eta-box .rank { width: 65px; color: #555; font-size: 12px; flex-shrink: 0; }
-  .eta-box .time { font-size: 20px; font-weight: 700; color: #1a3d7c; flex-shrink: 0; }
+  .eta-box .time {
+    font-size: 20px; font-weight: 700; color: #1a3d7c; flex-shrink: 0;
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .eta-box .exact-time {
+    font-size: 14px; font-weight: 500; color: #666;
+  }
   .eta-box .remark {
     font-size: 12px; color: #e67e22; margin-left: auto;
     min-width: 0; overflow: hidden;
@@ -467,6 +473,7 @@
 
     .eta-box { max-height: 220px; padding: 8px 12px; }
     .eta-box .time { font-size: 18px; }
+    .eta-box .exact-time { font-size: 13px; }
     .eta-box .rank { width: 55px; font-size: 11px; }
     .eta-header h3 small { font-size: 11px; }
 
@@ -600,7 +607,7 @@
       <span class="header-logo-badge">
         <img class="header-logo" src="bus.png" alt="巴士" />
       </span>
-      香港巴士預報系統
+      Ansum Bus
     </h1>
     <div class="header-meta">
       <span class="header-clock" title="現在時間">{{ clockText }}</span>
@@ -752,7 +759,10 @@
         <ul v-else>
           <li v-for="(e, i) in etas" :key="i">
             <span class="rank">第 {{ i + 1 }} 班</span>
-            <span class="time">{{ formatMinutes(e.minutes) }}</span>
+            <span class="time">
+              <span>{{ formatMinutes(e.minutes) }}</span>
+              <span v-if="e.exactTime" class="exact-time">{{ e.exactTime }}</span>
+            </span>
             <span class="remark" v-if="e.remark">{{ e.remark }}</span>
           </li>
 
@@ -856,13 +866,21 @@ function toApiDirection(bound) {
   return bound === "O" ? "outbound" : "inbound";
 }
 
+function formatExactTime(isoOrDateObj) {
+  if (!isoOrDateObj) return "";
+  const d = typeof isoOrDateObj === "string" ? new Date(isoOrDateObj) : isoOrDateObj;
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `(${pad(d.getHours())}:${pad(d.getMinutes())})`;
+}
+
 const LWB_ROUTE_PREFIXES = ["A3", "A4", "A5", "E3", "E4", "N3", "N4", "R3", "R4", "S1", "S5", "X3", "X4"];
 function isLwbRoute(routeNum) {
   const r = routeNum.toUpperCase();
   return LWB_ROUTE_PREFIXES.some(p => r.startsWith(p));
 }
 
-/* ---------- KMB + LWB（合併，不再過濾 LWB） ---------- */
+/* ---------- KMB + LWB ---------- */
 async function fetchKmbRoutes() {
   const j = await getJSON(`${KMB_BASE}/route/`);
   return j.data.map(r => ({
@@ -891,8 +909,12 @@ async function fetchKmbEta(stopId, route, serviceType = "1") {
   const j = await getJSON(`${KMB_BASE}/eta/${stopId}/${route}/${serviceType}`);
   const now = Date.now();
   const items = j.data.filter(e => e.eta).slice(0, 3).map(e => ({
-    eta: e.eta, minutes: minutesUntil(e.eta), remark: e.rmk_tc || "",
-    company: e.co, dataTimestamp: e.data_timestamp,
+    eta: e.eta,
+    minutes: minutesUntil(e.eta),
+    exactTime: formatExactTime(e.eta),
+    remark: e.rmk_tc || "",
+    company: e.co,
+    dataTimestamp: e.data_timestamp,
   }));
   const ageSeconds = items.length && items[0].dataTimestamp
     ? Math.max(0, Math.round((now - new Date(items[0].dataTimestamp).getTime()) / 1000))
@@ -933,8 +955,12 @@ async function fetchCitybusEta(stopId, route) {
   const j = await getJSON(`${CTB_BASE}/eta/CTB/${stopId}/${route}`);
   const now = Date.now();
   const items = j.data.filter(e => e.eta).slice(0, 3).map(e => ({
-    eta: e.eta, minutes: minutesUntil(e.eta), remark: e.rmk_tc || "",
-    company: "CTB", dataTimestamp: e.data_timestamp,
+    eta: e.eta,
+    minutes: minutesUntil(e.eta),
+    exactTime: formatExactTime(e.eta),
+    remark: e.rmk_tc || "",
+    company: "CTB",
+    dataTimestamp: e.data_timestamp,
   }));
   const ageSeconds = items.length && items[0].dataTimestamp
     ? Math.max(0, Math.round((now - new Date(items[0].dataTimestamp).getTime()) / 1000))
@@ -946,7 +972,6 @@ async function fetchCitybusEta(stopId, route) {
 async function fetchNlbRoutes() {
   const j = await getJSON(`${NLB_BASE}/route.php?action=list`);
   return (j.routes || []).map(r => {
-    // 從 routeName_c 解析起點與終點；格式通常為 "起點 > 終點"
     const parts = String(r.routeName_c || "").split(/\s*>\s*/);
     const orig = (parts[0] || "").trim();
     const dest = (parts[1] || "").trim();
@@ -975,13 +1000,17 @@ async function fetchNlbEta(routeId, stopId) {
   const url = `${NLB_BASE}/stop.php?action=estimatedArrivals&routeId=${encodeURIComponent(routeId)}&stopId=${encodeURIComponent(stopId)}&language=zh`;
   const j = await getJSON(url);
   const arr = Array.isArray(j.estimatedArrivals) ? j.estimatedArrivals : [];
-  const items = arr.slice(0, 3).map(e => ({
-    eta: e.estimatedArrivalTime,
-    minutes: nlbMinutesUntil(e.estimatedArrivalTime),
-    remark: e.noGPS ? "無GPS" : (e.departed ? "已開出" : ""),
-    company: "NLB",
-    dataTimestamp: e.generateTime,
-  }));
+  const items = arr.slice(0, 3).map(e => {
+    const parsedDate = nlbParseTime(e.estimatedArrivalTime);
+    return {
+      eta: e.estimatedArrivalTime,
+      minutes: nlbMinutesUntil(e.estimatedArrivalTime),
+      exactTime: formatExactTime(parsedDate),
+      remark: e.noGPS ? "無GPS" : (e.departed ? "已開出" : ""),
+      company: "NLB",
+      dataTimestamp: e.generateTime,
+    };
+  });
   const ageSeconds = arr.length && arr[0].generateTime
     ? Math.max(0, Math.round((Date.now() - nlbParseTime(arr[0].generateTime).getTime()) / 1000))
     : null;
@@ -989,7 +1018,6 @@ async function fetchNlbEta(routeId, stopId) {
 }
 function nlbParseTime(s) {
   if (!s) return new Date(0);
-  // NLB 回傳格式："2026-09-21 17:00:00"（HK 本地時間，無時區）
   return new Date(String(s).replace(" ", "T") + "+08:00");
 }
 function nlbMinutesUntil(s) {
@@ -1184,7 +1212,7 @@ function loadFavouritesFromStorage() {
 const AUTO_REFRESH_INTERVAL = 30;
 
 /* =========================================================
-   NLB 圖示（內嵌 SVG，仿官方 N 字標誌）
+   NLB 圖示
    ========================================================= */
 const NLB_LOGO = "data:image/svg+xml;utf8," + encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
@@ -1250,7 +1278,6 @@ createApp({
       writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
     }
 
-    /* 取得目前選中路線的真實營運商（供最愛比對使用） */
     function realOperatorOf(route, uiCompany) {
       if (!route) return uiCompany;
       if (uiCompany === "KMB" && route.isLwb) return "LWB";
@@ -1263,8 +1290,6 @@ createApp({
       const map = new Map();
       for (const r of allRoutes.value) {
         if (r.route.toUpperCase() !== q) continue;
-        // NLB：每個 routeId 是獨立方向
-        // KMB/CTB：以 route + direction + serviceType 去重
         const key = r.isNlb
           ? "NLB+" + r.routeId
           : r.route + "+" + r.direction + "+" + r.serviceType;
@@ -1312,7 +1337,6 @@ createApp({
       try {
         let list = [];
         if (company.value === "KMB") {
-          // 九巴按鈕：KMB + LWB 一起載入
           list = await fetchKmbRoutes();
         } else if (company.value === "CTB") {
           list = await fetchCitybusRoutes();
@@ -1472,10 +1496,8 @@ createApp({
       const r = findCurrentRoute();
       if (!r) return;
 
-      // 真實營運商：LWB 與 KMB 分開記錄
       const realCompany = realOperatorOf(r, company.value);
 
-      // 找現有（若已在最愛中則移除）
       const existingIdx = favourites.value.findIndex(f =>
         f && f.company === realCompany && f.directionKey === routeKey.value
       );
@@ -1499,7 +1521,7 @@ createApp({
         direction: r.direction,
         serviceType: r.serviceType || "1",
         directionKey: r.key,
-        routeId: r.routeId || null,  // NLB 專用
+        routeId: r.routeId || null,
         label: selectedDirectionLabel.value,
         orig_tc: r.orig_tc,
         dest_tc: r.dest_tc,
@@ -1528,7 +1550,6 @@ createApp({
 
       statusText.value = `載入最愛 ${fav.route}…`;
 
-      // LWB 收藏 → 使用「九巴」按鈕（九巴按鈕同時載入 KMB + LWB）
       const targetCompany = fav.company === "LWB" ? "KMB" : fav.company;
 
       if (company.value !== targetCompany) {
