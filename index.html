@@ -271,7 +271,6 @@
   }
   .stop-list li.active .distance { background: #ffd5d5; color: #c0392b; }
 
-  /* 狀態列：隱藏（改由下方其他 UI 顯示資訊） */
   .status { display: none; }
 
   .hint { color: #999; font-size: 13px; padding: 6px 0; word-break: break-word; }
@@ -317,7 +316,6 @@
 
   .map-row-mobile { display: none; }
 
-  /* ETA 面板 */
   .eta-box {
     padding: 10px 14px; max-height: 220px;
     overflow-y: auto; flex-shrink: 0; min-width: 0;
@@ -412,10 +410,7 @@
   }
   @keyframes freshBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-  /* Bug 圖示：隱藏 */
   .debug-toggle { display: none !important; }
-
-  /* 隱藏後 debug 面板也一併隱藏，避免殘留 */
   #debug-panel { display: none !important; }
 
   @keyframes busPulse {
@@ -657,7 +652,6 @@
         提示：輸入路線後按「查詢」，再選巴士公司
       </div>
 
-      <!-- 狀態列：隱藏 (CSS: .status { display: none }) -->
       <div class="status">狀態：{{ statusText }}</div>
 
       <div class="map-row-mobile" @click="expandMap">
@@ -815,7 +809,6 @@
     </div>
   </Teleport>
 
-  <!-- Bug 圖示：隱藏 (CSS: .debug-toggle { display: none }) -->
   <div class="debug-toggle" @click="showDebug = !showDebug">🐞</div>
   <div id="debug-panel" :class="{ show: showDebug }"></div>
 </div>
@@ -823,16 +816,8 @@
 <script>
 const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
-/* Debug 訊息寫到隱藏的 console；保留函式避免呼叫端報錯 */
-function dbg(msg, cls = "info") {
-  console.log(`[${new Date().toLocaleTimeString()}] ${msg}`);
-}
-
-function dbgError(label, err) {
-  const msg = err && err.message ? err.message : String(err);
-  console.error(`[${new Date().toLocaleTimeString()}] ❌ ${label}：${msg}`);
-  if (err && err.stack) console.error(err.stack);
-}
+function dbg(msg) { console.log(`[${new Date().toLocaleTimeString()}] ${msg}`); }
+function dbgError(label, err) { console.error(`[${new Date().toLocaleTimeString()}] ❌ ${label}：${err && err.message ? err.message : err}`); }
 
 window.addEventListener("error", (e) => {
   console.error(`[${new Date().toLocaleTimeString()}] ❌ ${e.message} @${e.filename}:${e.lineno}:${e.colno}`);
@@ -846,6 +831,7 @@ window.addEventListener("unhandledrejection", (e) => {
    ========================================================= */
 const KMB_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
+const NLB_BASE = "https://rt.data.gov.hk/v2/transport/nlb";
 
 async function getJSON(url) {
   const res = await fetch(url);
@@ -863,11 +849,15 @@ function isLwbRoute(routeNum) {
   return LWB_ROUTE_PREFIXES.some(p => r.startsWith(p));
 }
 
+/* ---------- KMB + LWB（合併，不再過濾 LWB） ---------- */
 async function fetchKmbRoutes() {
   const j = await getJSON(`${KMB_BASE}/route/`);
   return j.data.map(r => ({
-    route: r.route, orig_tc: r.orig_tc, dest_tc: r.dest_tc,
-    direction: r.bound, serviceType: r.service_type || "1",
+    route: r.route,
+    orig_tc: r.orig_tc,
+    dest_tc: r.dest_tc,
+    direction: r.bound,
+    serviceType: r.service_type || "1",
     isLwb: isLwbRoute(r.route),
   }));
 }
@@ -897,6 +887,7 @@ async function fetchKmbEta(stopId, route, serviceType = "1") {
   return { items, ageSeconds };
 }
 
+/* ---------- CTB ---------- */
 async function fetchCitybusRoutes() {
   const j = await getJSON(`${CTB_BASE}/route/CTB`);
   const list = [];
@@ -936,6 +927,62 @@ async function fetchCitybusEta(stopId, route) {
     ? Math.max(0, Math.round((now - new Date(items[0].dataTimestamp).getTime()) / 1000))
     : null;
   return { items, ageSeconds };
+}
+
+/* ---------- NLB ---------- */
+async function fetchNlbRoutes() {
+  const j = await getJSON(`${NLB_BASE}/route.php?action=list`);
+  return (j.routes || []).map(r => {
+    // 從 routeName_c 解析起點與終點；格式通常為 "起點 > 終點"
+    const parts = String(r.routeName_c || "").split(/\s*>\s*/);
+    const orig = (parts[0] || "").trim();
+    const dest = (parts[1] || "").trim();
+    return {
+      route: r.routeNo,
+      routeId: String(r.routeId),
+      orig_tc: orig || r.routeName_c,
+      dest_tc: dest || "",
+      direction: "O",
+      serviceType: "1",
+      isLwb: false,
+      isNlb: true,
+    };
+  });
+}
+async function fetchNlbRouteStops(routeId) {
+  const j = await getJSON(`${NLB_BASE}/stop.php?action=list&routeId=${encodeURIComponent(routeId)}`);
+  return (j.stops || []).map(s => ({
+    id: String(s.stopId),
+    name: s.stopName_c,
+    lat: Number(s.latitude),
+    lng: Number(s.longitude),
+  }));
+}
+async function fetchNlbEta(routeId, stopId) {
+  const url = `${NLB_BASE}/stop.php?action=estimatedArrivals&routeId=${encodeURIComponent(routeId)}&stopId=${encodeURIComponent(stopId)}&language=zh`;
+  const j = await getJSON(url);
+  const arr = Array.isArray(j.estimatedArrivals) ? j.estimatedArrivals : [];
+  const items = arr.slice(0, 3).map(e => ({
+    eta: e.estimatedArrivalTime,
+    minutes: nlbMinutesUntil(e.estimatedArrivalTime),
+    remark: e.noGPS ? "無GPS" : (e.departed ? "已開出" : ""),
+    company: "NLB",
+    dataTimestamp: e.generateTime,
+  }));
+  const ageSeconds = arr.length && arr[0].generateTime
+    ? Math.max(0, Math.round((Date.now() - nlbParseTime(arr[0].generateTime).getTime()) / 1000))
+    : null;
+  return { items, ageSeconds };
+}
+function nlbParseTime(s) {
+  if (!s) return new Date(0);
+  // NLB 回傳格式："2026-09-21 17:00:00"（HK 本地時間，無時區）
+  return new Date(String(s).replace(" ", "T") + "+08:00");
+}
+function nlbMinutesUntil(s) {
+  if (!s) return null;
+  const d = nlbParseTime(s);
+  return Math.max(0, Math.round((d - new Date()) / 60000));
 }
 
 function minutesUntil(iso) {
@@ -1063,9 +1110,7 @@ function readCookie(name) {
     );
     const m = document.cookie.match(pattern);
     return m ? decodeURIComponent(m[1]) : null;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 function writeCookie(name, value, days) {
@@ -1076,9 +1121,7 @@ function writeCookie(name, value, days) {
       "; expires=" + expires +
       "; path=/; SameSite=Lax";
     return true;
-  } catch (e) {
-    return false;
-  }
+  } catch (e) { return false; }
 }
 
 function parseFavArray(raw) {
@@ -1094,18 +1137,14 @@ function parseFavArray(raw) {
       }
     }
     return result;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 function loadFavouritesFromStorage() {
   let fromLS = null;
   try {
     fromLS = parseFavArray(localStorage.getItem(FAV_STORAGE_KEY));
-  } catch (e) {
-    console.warn("localStorage 讀取失敗", e);
-  }
+  } catch (e) { console.warn("localStorage 讀取失敗", e); }
   const fromCookie = parseFavArray(readCookie(FAV_STORAGE_KEY));
 
   const countLS = fromLS ? fromLS.filter(Boolean).length : 0;
@@ -1132,6 +1171,27 @@ function loadFavouritesFromStorage() {
 const AUTO_REFRESH_INTERVAL = 30;
 
 /* =========================================================
+   NLB 圖示（內嵌 SVG，仿官方 N 字標誌）
+   ========================================================= */
+const NLB_LOGO = "data:image/svg+xml;utf8," + encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="nlb-g" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#A4D65E"/>
+        <stop offset="55%" stop-color="#26A69A"/>
+        <stop offset="100%" stop-color="#0D47A1"/>
+      </linearGradient>
+    </defs>
+    <g fill="none" stroke="url(#nlb-g)" stroke-width="13"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 22 78 L 22 48 Q 22 25 42 25 L 42 25"/>
+      <path d="M 42 25 L 72 75"/>
+      <path d="M 72 75 L 72 45 Q 72 25 82 25"/>
+    </g>
+  </svg>
+`);
+
+/* =========================================================
    Vue App
    ========================================================= */
 createApp({
@@ -1143,9 +1203,7 @@ createApp({
       { id: "CTB", name: "城巴",
         logo: "data:image/svg+xml;utf8," + encodeURIComponent(
           `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><rect width="100" height="60" fill="#ffd400"/><circle cx="50" cy="24" r="16" fill="#e30613"/><polygon points="58,10 26,24 58,38 46,24" fill="#ffd400"/><text x="50" y="52" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#1565c0" text-anchor="middle">城巴Citybus</text></svg>`) },
-      { id: "LWB", name: "龍運",
-        logo: "data:image/svg+xml;utf8," + encodeURIComponent(
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><rect width="100" height="60" fill="#ffffff"/><text x="50" y="42" font-family="Arial Black, Arial, sans-serif" font-size="34" font-weight="900" fill="#ff6600" text-anchor="middle">LWB</text></svg>`) },
+      { id: "NLB", name: "新大嶼山巴士", logo: NLB_LOGO },
     ];
 
     const company = ref("KMB");
@@ -1175,10 +1233,15 @@ createApp({
 
     function saveFavourites() {
       const json = JSON.stringify(favourites.value);
-      try {
-        localStorage.setItem(FAV_STORAGE_KEY, json);
-      } catch (e) {}
+      try { localStorage.setItem(FAV_STORAGE_KEY, json); } catch (e) {}
       writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
+    }
+
+    /* 取得目前選中路線的真實營運商（供最愛比對使用） */
+    function realOperatorOf(route, uiCompany) {
+      if (!route) return uiCompany;
+      if (uiCompany === "KMB" && route.isLwb) return "LWB";
+      return uiCompany;
     }
 
     const matchedRoutes = computed(() => {
@@ -1187,7 +1250,11 @@ createApp({
       const map = new Map();
       for (const r of allRoutes.value) {
         if (r.route.toUpperCase() !== q) continue;
-        const key = r.route + "+" + r.direction + "+" + r.serviceType;
+        // NLB：每個 routeId 是獨立方向
+        // KMB/CTB：以 route + direction + serviceType 去重
+        const key = r.isNlb
+          ? "NLB+" + r.routeId
+          : r.route + "+" + r.direction + "+" + r.serviceType;
         if (!map.has(key)) map.set(key, { ...r, key });
       }
       return [...map.values()];
@@ -1206,8 +1273,9 @@ createApp({
 
     const isCurrentFavourite = computed(() => {
       if (!routeKey.value) return false;
+      const currentReal = realOperatorOf(selectedRoute.value, company.value);
       return favourites.value.some(f =>
-        f && f.company === company.value && f.directionKey === routeKey.value
+        f && f.company === currentReal && f.directionKey === routeKey.value
       );
     });
 
@@ -1231,13 +1299,12 @@ createApp({
       try {
         let list = [];
         if (company.value === "KMB") {
-          const all = await fetchKmbRoutes();
-          list = all.filter(r => !r.isLwb);
-        } else if (company.value === "LWB") {
-          const all = await fetchKmbRoutes();
-          list = all.filter(r => r.isLwb);
-        } else {
+          // 九巴按鈕：KMB + LWB 一起載入
+          list = await fetchKmbRoutes();
+        } else if (company.value === "CTB") {
           list = await fetchCitybusRoutes();
+        } else if (company.value === "NLB") {
+          list = await fetchNlbRoutes();
         }
         if (token !== loadToken) return;
         allRoutes.value = list;
@@ -1355,7 +1422,9 @@ createApp({
       countdown.value = null;
       try {
         let detailed = [];
-        if (company.value === "KMB" || company.value === "LWB") {
+        if (company.value === "NLB") {
+          detailed = await fetchNlbRouteStops(r.routeId);
+        } else if (company.value === "KMB") {
           const seq = await fetchKmbRouteStops(r.route, r.direction, r.serviceType || "1");
           const results = await Promise.all(seq.map(s => fetchKmbStop(s.stopId)));
           detailed = results.filter(s => s !== null);
@@ -1387,9 +1456,15 @@ createApp({
 
     function toggleFavourite() {
       if (!routeKey.value || !selectedDirectionLabel.value) return;
+      const r = findCurrentRoute();
+      if (!r) return;
 
+      // 真實營運商：LWB 與 KMB 分開記錄
+      const realCompany = realOperatorOf(r, company.value);
+
+      // 找現有（若已在最愛中則移除）
       const existingIdx = favourites.value.findIndex(f =>
-        f && f.company === company.value && f.directionKey === routeKey.value
+        f && f.company === realCompany && f.directionKey === routeKey.value
       );
       if (existingIdx !== -1) {
         favourites.value[existingIdx] = null;
@@ -1405,15 +1480,13 @@ createApp({
         return;
       }
 
-      const r = findCurrentRoute();
-      if (!r) return;
-
       favourites.value[emptyIdx] = {
-        company: company.value,
+        company: realCompany,
         route: r.route,
         direction: r.direction,
         serviceType: r.serviceType || "1",
         directionKey: r.key,
+        routeId: r.routeId || null,  // NLB 專用
         label: selectedDirectionLabel.value,
         orig_tc: r.orig_tc,
         dest_tc: r.dest_tc,
@@ -1442,8 +1515,11 @@ createApp({
 
       statusText.value = `載入最愛 ${fav.route}…`;
 
-      if (company.value !== fav.company) {
-        company.value = fav.company;
+      // LWB 收藏 → 使用「九巴」按鈕（九巴按鈕同時載入 KMB + LWB）
+      const targetCompany = fav.company === "LWB" ? "KMB" : fav.company;
+
+      if (company.value !== targetCompany) {
+        company.value = targetCompany;
         await loadRoutes();
       }
 
@@ -1556,7 +1632,9 @@ createApp({
 
       try {
         let result;
-        if (company.value === "KMB" || company.value === "LWB") {
+        if (company.value === "NLB") {
+          result = await fetchNlbEta(r.routeId, stop.id);
+        } else if (company.value === "KMB") {
           result = await fetchKmbEta(stop.id, r.route, r.serviceType || "1");
         } else {
           result = await fetchCitybusEta(stop.id, r.route);
