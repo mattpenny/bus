@@ -44,12 +44,22 @@
     object-fit: contain; display: block;
   }
   header.app-header p { margin: 0; font-size: 11px; opacity: 0.75; flex-shrink: 0; }
+  header.app-header .header-meta {
+    display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0; min-width: 0;
+  }
+  header.app-header .header-clock {
+    font-size: 14px; font-weight: 600; letter-spacing: 0.4px;
+    font-variant-numeric: tabular-nums; opacity: 0.95;
+    white-space: nowrap; flex-shrink: 0;
+  }
   @media (max-width: 600px) {
     header.app-header { padding: 8px 12px; }
     header.app-header h1 { font-size: 15px; }
     header.app-header .header-logo-badge { width: 30px; height: 30px; }
     header.app-header .header-logo { width: 21px; height: 21px; }
     header.app-header p { display: none; }
+    header.app-header .header-clock { font-size: 13px; }
   }
 
   .layout {
@@ -592,7 +602,10 @@
       </span>
       香港巴士預報系統
     </h1>
-    <p>資料來源：資料一線通 · 地圖：地政總署 CSDI</p>
+    <div class="header-meta">
+      <span class="header-clock" title="現在時間">{{ clockText }}</span>
+      <p>資料來源：資料一線通 · 地圖：地政總署 CSDI</p>
+    </div>
   </header>
 
   <div class="layout">
@@ -1863,8 +1876,15 @@ createApp({
     }
 
     let tickTimer = null;
+    const clockText = ref(formatClock(new Date()));
+
+    function formatClock(d) {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
 
     function tick() {
+      clockText.value = formatClock(new Date());
       if (dataAge.value !== null && !refreshing.value) {
         dataAge.value += 1;
       }
@@ -1915,7 +1935,7 @@ createApp({
     return {
       companies, company, routeInput, lastSearched, searched,
       allRoutes, matchedRoutes, routeKey, stops, selectedStop, etas,
-      dataAge, countdown, refreshing,
+      dataAge, countdown, refreshing, clockText,
       loadingStops, error, statusText, showDebug, stopListRef,
       mapExpanded, mapRowText, pickingDirection, selectedDirectionLabel,
       isMobile, showCompanyPicker,
