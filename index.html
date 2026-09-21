@@ -758,9 +758,6 @@
 <script>
 const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
-/* =========================================================
-   改良版 debug：加入堆疊資訊，方便定位問題
-   ========================================================= */
 function dbg(msg, cls = "info") {
   const time = new Date().toLocaleTimeString();
   const el = document.getElementById("debug-panel");
@@ -833,8 +830,8 @@ async function fetchKmbRouteStops(route, direction, serviceType = "1") {
 async function fetchKmbStop(stopId) {
   const j = await getJSON(`${KMB_BASE}/stop/${stopId}`);
   const s = j.data;
-  const lat = parseFloat(s.lat);
-  const lng = parseFloat(s.long);
+  const lat = Number(s.lat);
+  const lng = Number(s.long);
   if (!isFinite(lat) || !isFinite(lng)) return null;
   return { id: s.stop, name: s.name_tc, lat, lng };
 }
@@ -874,8 +871,8 @@ async function fetchCitybusRouteStops(route, direction) {
 async function fetchCitybusStop(stopId) {
   const j = await getJSON(`${CTB_BASE}/stop/${stopId}`);
   const s = j.data;
-  const lat = parseFloat(s.lat);
-  const lng = parseFloat(s.long);
+  const lat = Number(s.lat);
+  const lng = Number(s.long);
   if (!isFinite(lat) || !isFinite(lng)) return null;
   return { id: s.stop, name: s.name_tc, lat, lng };
 }
@@ -924,6 +921,27 @@ function isValidCoord(lat, lng) {
     lng >= -180 && lng <= 180 &&
     !(lat === 0 && lng === 0)
   );
+}
+
+/* 轉成 Leaflet 可用的 [lat, lng]，若不合法回傳 null */
+function safeLatLng(lat, lng) {
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  if (!isFinite(nLat) || !isFinite(nLng)) return null;
+  if (nLat < -90 || nLat > 90 || nLng < -180 || nLng > 180) return null;
+  if (nLat === 0 && nLng === 0) return null;
+  return [nLat, nLng];
+}
+
+/* 檢查地圖容器是否可見（有實際尺寸） */
+function isMapUsable(map) {
+  if (!map) return false;
+  try {
+    const c = map.getContainer();
+    return !!c && c.clientWidth > 0 && c.clientHeight > 0;
+  } catch (e) {
+    return false;
+  }
 }
 
 /* =========================================================
@@ -1311,8 +1329,15 @@ createApp({
         stops.value = validStops;
         statusText.value = `路線 ${r.route} 共 ${validStops.length} 個站`;
 
-        if (mapDesktop) {
-          activeMap = mapDesktop;
+        // 只在「可見」的地圖上繪製
+        // - 桌面：mapDesktop（一定可見）
+        // - 手機：只有當地圖浮層已展開且 mapMobile 存在時
+        const targetMap = isMobile.value
+          ? (mapExpanded.value ? mapMobile : null)
+          : mapDesktop;
+
+        if (isMapUsable(targetMap)) {
+          activeMap = targetMap;
           drawOnActiveMap();
         }
 
@@ -1400,8 +1425,8 @@ createApp({
         }
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
+            const lat = Number(pos.coords.latitude);
+            const lng = Number(pos.coords.longitude);
             if (!isValidCoord(lat, lng)) {
               reject(new Error("無法取得位置資訊"));
               return;
@@ -1462,7 +1487,8 @@ createApp({
       if (mapExpanded.value) mapExpanded.value = false;
       await nextTick();
       await scrollSelectedIntoView(stop);
-      if (activeMap) focusMapOnStop(stop);
+      // 只在可見地圖上飛過去
+      if (isMapUsable(activeMap)) focusMapOnStop(stop);
       await refreshEta();
     }
 
@@ -1531,73 +1557,91 @@ createApp({
 
     function initMaps() {
       mapDesktop = createMapOn("map-desktop");
-      activeMap = mapDesktop;
+      if (isMapUsable(mapDesktop)) activeMap = mapDesktop;
     }
 
     function drawOnActiveMap() {
-      if (!activeMap) return;
-      activeMarkers.forEach(({ marker }) => activeMap.removeLayer(marker));
-      if (activeRouteLine) { activeMap.removeLayer(activeRouteLine); activeRouteLine = null; }
-      activeMarkers = [];
-      if (!stops.value.length) return;
-
-      const drawable = stops.value.filter(s => isValidCoord(s.lat, s.lng));
-      if (!drawable.length) return;
-
-      drawable.forEach(s => {
-        const marker = L.marker([s.lat, s.lng], { icon: BUS_PIN_DEFAULT }).addTo(activeMap);
-        marker.bindTooltip(s.name, { direction: "top", offset: [0, -26] });
-        marker.on("click", () => onStopClick(s));
-        activeMarkers.push({ marker, stop: s });
-      });
-
-      activeRouteLine = L.polyline(
-        drawable.map(s => [s.lat, s.lng]),
-        { color: "#1a3d7c", weight: 3, opacity: 0.55, dashArray: "6,6" }
-      ).addTo(activeMap);
-
-      if (selectedStop.value && isValidCoord(selectedStop.value.lat, selectedStop.value.lng)) {
-        activeMarkers.forEach(({ marker, stop: s }) => {
-          marker.setIcon(s.id === selectedStop.value.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
-          marker.setZIndexOffset(s.id === selectedStop.value.id ? 1000 : 0);
-        });
-        try {
-          activeMap.setView(
-            [selectedStop.value.lat, selectedStop.value.lng],
-            Math.max(activeMap.getZoom(), 15)
-          );
-        } catch (e) {}
-      } else {
-        try {
-          activeMap.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
-        } catch (e) {}
+      if (!isMapUsable(activeMap)) {
+        dbg("地圖不可用（容器尺寸為 0），跳過繪製", "info");
+        return;
       }
+      try {
+        activeMarkers.forEach(({ marker }) => activeMap.removeLayer(marker));
+        if (activeRouteLine) { activeMap.removeLayer(activeRouteLine); activeRouteLine = null; }
+        activeMarkers = [];
+        if (!stops.value.length) return;
 
-      if (lastUserPos && isValidCoord(lastUserPos.lat, lastUserPos.lng)) {
-        showUserMarker(lastUserPos.lat, lastUserPos.lng);
+        // 二次驗證：轉成 number 並檢查有效
+        const drawable = [];
+        for (const s of stops.value) {
+          const ll = safeLatLng(s.lat, s.lng);
+          if (ll) drawable.push({ ...s, _ll: ll });
+        }
+        if (!drawable.length) return;
+
+        drawable.forEach(s => {
+          const marker = L.marker(s._ll, { icon: BUS_PIN_DEFAULT }).addTo(activeMap);
+          marker.bindTooltip(s.name, { direction: "top", offset: [0, -26] });
+          marker.on("click", () => onStopClick(s));
+          activeMarkers.push({ marker, stop: s });
+        });
+
+        activeRouteLine = L.polyline(
+          drawable.map(s => s._ll),
+          { color: "#1a3d7c", weight: 3, opacity: 0.55, dashArray: "6,6" }
+        ).addTo(activeMap);
+
+        const selLL = selectedStop.value
+          ? safeLatLng(selectedStop.value.lat, selectedStop.value.lng)
+          : null;
+
+        if (selLL) {
+          activeMarkers.forEach(({ marker, stop: s }) => {
+            marker.setIcon(s.id === selectedStop.value.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
+            marker.setZIndexOffset(s.id === selectedStop.value.id ? 1000 : 0);
+          });
+          activeMap.setView(selLL, Math.max(activeMap.getZoom(), 15));
+        } else {
+          activeMap.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
+        }
+
+        if (lastUserPos) {
+          const userLL = safeLatLng(lastUserPos.lat, lastUserPos.lng);
+          if (userLL) showUserMarker(lastUserPos.lat, lastUserPos.lng);
+        }
+      } catch (e) {
+        dbgError("drawOnActiveMap", e);
       }
     }
 
     function focusMapOnStop(stop) {
-      if (!activeMap || !isValidCoord(stop.lat, stop.lng)) return;
-      activeMarkers.forEach(({ marker, stop: s }) => {
-        marker.setIcon(s.id === stop.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
-        marker.setZIndexOffset(s.id === stop.id ? 1000 : 0);
-      });
+      if (!isMapUsable(activeMap)) return;
+      const ll = safeLatLng(stop.lat, stop.lng);
+      if (!ll) return;
       try {
+        activeMarkers.forEach(({ marker, stop: s }) => {
+          marker.setIcon(s.id === stop.id ? BUS_PIN_SELECTED : BUS_PIN_DEFAULT);
+          marker.setZIndexOffset(s.id === stop.id ? 1000 : 0);
+        });
         const targetZoom = Math.max(activeMap.getZoom(), 15);
-        activeMap.flyTo([stop.lat, stop.lng], targetZoom, { duration: 0.6 });
-      } catch (e) {}
+        activeMap.flyTo(ll, targetZoom, { duration: 0.6 });
+      } catch (e) {
+        dbgError("focusMapOnStop", e);
+      }
     }
 
     function showUserMarker(lat, lng) {
       lastUserPos = { lat: lat, lng: lng };
-      if (!activeMap || !isValidCoord(lat, lng)) return;
-      if (activeUserMarker) activeMap.removeLayer(activeUserMarker);
+      if (!isMapUsable(activeMap)) return;
+      const ll = safeLatLng(lat, lng);
+      if (!ll) return;
       try {
-        activeUserMarker = L.marker([lat, lng], { icon: USER_ICON }).addTo(activeMap);
+        if (activeUserMarker) activeMap.removeLayer(activeUserMarker);
+        activeUserMarker = L.marker(ll, { icon: USER_ICON }).addTo(activeMap);
         activeUserMarker.bindTooltip("你的位置", { direction: "top" });
-      } catch (e) {}
+      } catch (e) {
+        dbgError("showUserMarker", e);
+      }
     }
 
     async function expandMap() {
@@ -1616,66 +1660,85 @@ createApp({
         return;
       }
 
-      if (!mapMobile) {
-        mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
-        L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
-        L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
-      } else if (mapMobile.getContainer() !== container) {
-        mapMobile.remove();
-        mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
-        L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
-        L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
+      try {
+        if (!mapMobile) {
+          mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
+          L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
+          L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
+        } else if (mapMobile.getContainer() !== container) {
+          mapMobile.remove();
+          mapMobile = L.map(container, { zoomControl: false }).setView(HK_CENTER, HK_ZOOM);
+          L.tileLayer(TILE_BASEMAP, { maxZoom: 19, attribution: "© 地政總署" }).addTo(mapMobile);
+          L.tileLayer(TILE_LABEL_TC, { maxZoom: 19, pane: "overlayPane" }).addTo(mapMobile);
+        }
+      } catch (e) {
+        dbgError("expandMap init", e);
+        return;
       }
 
       activeMap = mapMobile;
 
       await new Promise((r) => setTimeout(r, 120));
-      mapMobile.invalidateSize();
+      try { mapMobile.invalidateSize(); } catch (e) {}
       drawOnActiveMap();
 
-      if (selectedStop.value && lastUserPos && isValidCoord(lastUserPos.lat, lastUserPos.lng)) {
-        try {
-          mapMobile.fitBounds(
-            [
-              [lastUserPos.lat, lastUserPos.lng],
-              [selectedStop.value.lat, selectedStop.value.lng]
-            ],
-            { padding: [70, 70] }
-          );
-        } catch (e) {}
-      } else if (selectedStop.value) {
-        focusMapOnStop(selectedStop.value);
-      } else if (activeRouteLine) {
-        try {
+      if (!isMapUsable(mapMobile)) {
+        dbg("手機地圖容器尺寸仍為 0，稍後重試", "info");
+        setTimeout(() => {
+          try { mapMobile.invalidateSize(); } catch (e) {}
+          drawOnActiveMap();
+        }, 250);
+        return;
+      }
+
+      const selLL = selectedStop.value
+        ? safeLatLng(selectedStop.value.lat, selectedStop.value.lng)
+        : null;
+      const userLL = lastUserPos
+        ? safeLatLng(lastUserPos.lat, lastUserPos.lng)
+        : null;
+
+      try {
+        if (selLL && userLL) {
+          mapMobile.fitBounds([userLL, selLL], { padding: [70, 70] });
+        } else if (selLL) {
+          focusMapOnStop(selectedStop.value);
+        } else if (activeRouteLine) {
           mapMobile.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
-        } catch (e) {}
+        }
+      } catch (e) {
+        dbgError("expandMap fit", e);
       }
     }
 
     function collapseMap() {
       mapExpanded.value = false;
-      if (window.matchMedia("(min-width: 901px)").matches && mapDesktop) {
+      if (!isMobile.value && isMapUsable(mapDesktop)) {
         activeMap = mapDesktop;
       }
     }
 
     function zoomIn() {
-      if (activeMap) activeMap.zoomIn();
-      else if (mapDesktop) mapDesktop.zoomIn();
+      if (isMapUsable(activeMap)) activeMap.zoomIn();
+      else if (isMapUsable(mapDesktop)) mapDesktop.zoomIn();
     }
     function zoomOut() {
-      if (activeMap) activeMap.zoomOut();
-      else if (mapDesktop) mapDesktop.zoomOut();
+      if (isMapUsable(activeMap)) activeMap.zoomOut();
+      else if (isMapUsable(mapDesktop)) mapDesktop.zoomOut();
     }
 
     function handleResize() {
-      if (mapDesktop) mapDesktop.invalidateSize();
-      if (mapMobile) mapMobile.invalidateSize();
+      if (mapDesktop) try { mapDesktop.invalidateSize(); } catch (e) {}
+      if (mapMobile)  try { mapMobile.invalidateSize();  } catch (e) {}
 
       isMobile.value = window.matchMedia("(max-width: 900px)").matches;
       if (!isMobile.value) {
         showCompanyPicker.value = false;
         if (mapExpanded.value) mapExpanded.value = false;
+        if (isMapUsable(mapDesktop)) {
+          activeMap = mapDesktop;
+          nextTick(drawOnActiveMap);
+        }
       }
     }
 
