@@ -661,9 +661,6 @@
             </template>
           </div>
         </div>
-        <div class="hint" style="font-size:calc(11px * var(--font-scale)); padding:4px 0 0;">
-          提示：搜尋路線後，按 ☆ 加入最愛
-        </div>
       </div>
 
       <hr class="fav-divider" />
@@ -688,10 +685,6 @@
                placeholder="例：1、968、A21"
                @keyup.enter="onSearch" />
         <button class="search-btn" @click="onSearch">查詢</button>
-      </div>
-
-      <div v-if="isMobile" class="hint" style="font-size:calc(11px * var(--font-scale)); padding:0 0 6px;">
-        提示：輸入路線後按「查詢」，再選巴士公司
       </div>
 
       <div class="status">狀態：{{ statusText }}</div>
