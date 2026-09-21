@@ -25,17 +25,19 @@ jobs:
 
       - name: Install Capacitor deps
         run: |
-          npm init -y
+          if [ ! -f package.json ]; then npm init -y; fi
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
       - name: Capacitor init
         run: |
-          npx cap init "Ansum Bus" "com.ansum.bus" --web-dir=.
-        continue-on-error: true
+          if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then
+            npx cap init "Ansum Bus" "com.ansum.bus" --web-dir=.
+          fi
 
       - name: Add Android platform
         run: |
-          npx cap add android || true
+          rm -rf android
+          npx cap add android
 
       - name: Set app name to "Ansum Bus"
         run: |
@@ -45,22 +47,25 @@ jobs:
             sed -i 's|<string name="title_activity_main">.*</string>|<string name="title_activity_main">Ansum Bus</string>|' "$STRINGS"
           fi
 
-      - name: Set app name to "Ansum Bus" (zh-HK)
-        run: |
-          mkdir -p android/app/src/main/res/values-zh-rHK
-          cat > android/app/src/main/res/values-zh-rHK/strings.xml <<'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Ansum Bus</string>
-    <string name="title_activity_main">Ansum Bus</string>
-</resources>
-EOF
-
       - name: Add Android permissions
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
           if [ -f "$MANIFEST" ]; then
-            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
+            python3 - "$MANIFEST" <<'PYEOF'
+          import sys
+          path = sys.argv[1]
+          with open(path, 'r', encoding='utf-8') as f:
+              content = f.read()
+          perms = (
+              '    <uses-permission android:name="android.permission.INTERNET" />\n'
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+          )
+          if 'ACCESS_FINE_LOCATION' not in content:
+              content = content.replace('<application', perms + '    <application', 1)
+              with open(path, 'w', encoding='utf-8') as f:
+                  f.write(content)
+          PYEOF
           fi
 
       - name: Sync web assets
