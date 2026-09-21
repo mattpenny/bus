@@ -6,9 +6,9 @@
 <title>香港巴士預報系統</title>
 <link rel="icon" type="image/png" href="bus.png" />
 <link rel="apple-touch-icon" href="bus.png" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; }
@@ -52,11 +52,6 @@
     header.app-header p { display: none; }
   }
 
-  /* =========================================================
-     Layout：關鍵修正
-     - 使用 minmax(0, ...) 讓 grid track 可以縮到比內容更窄
-     - 為 grid item 加上 min-width: 0
-     ========================================================= */
   .layout {
     flex: 1; min-height: 0; min-width: 0;
     display: grid;
@@ -78,9 +73,6 @@
     min-width: 0;
   }
 
-  /* =========================================================
-     我的最愛
-     ========================================================= */
   .fav-section { margin-bottom: 14px; min-width: 0; }
   .fav-section .title {
     font-size: 13px; color: #333; margin-bottom: 6px;
@@ -147,9 +139,6 @@
 
   .fav-divider { border: none; border-top: 1px solid #eef; margin: 12px 0; }
 
-  /* =========================================================
-     一般欄位
-     ========================================================= */
   .row {
     display: flex; align-items: center; gap: 6px;
     margin-bottom: 10px; min-width: 0;
@@ -377,6 +366,7 @@
     font-family: monospace; font-size: 11px;
     padding: 10px; border-radius: 8px; z-index: 9999;
     display: none; white-space: pre-wrap; line-height: 1.4;
+    word-break: break-all;
   }
   #debug-panel.show { display: block; }
   #debug-panel .err { color: #f55; }
@@ -389,9 +379,6 @@
     100% { transform: scale(1); }
   }
 
-  /* =========================================================
-     MOBILE ONLY
-     ========================================================= */
   @media (max-width: 900px) {
     .layout {
       grid-template-columns: minmax(0, 1fr);
@@ -434,7 +421,6 @@
 
     .stop-list { max-height: 60vh; }
 
-    /* 手機專用：加大觸控目標、避免 iOS 聚焦縮放 */
     .row label { min-width: 60px; }
     .row input[type="text"] {
       font-size: 16px; padding: 10px 12px;
@@ -445,7 +431,6 @@
       flex-shrink: 0;
     }
 
-    /* 更窄的手機 (≤ 380px) */
     @media (max-width: 380px) {
       .layout { padding: 6px; gap: 6px; }
       .panel { padding: 8px; }
@@ -461,9 +446,6 @@
     .map-row-mobile { display: none !important; }
   }
 
-  /* =========================================================
-     Overlays
-     ========================================================= */
   .map-overlay { display: none; }
   @media (max-width: 900px) {
     .map-overlay {
@@ -776,6 +758,9 @@
 <script>
 const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
+/* =========================================================
+   改良版 debug：加入堆疊資訊，方便定位問題
+   ========================================================= */
 function dbg(msg, cls = "info") {
   const time = new Date().toLocaleTimeString();
   const el = document.getElementById("debug-panel");
@@ -789,10 +774,21 @@ function dbg(msg, cls = "info") {
   console.log(`[${time}] ${msg}`);
 }
 
-window.addEventListener("error", (e) => dbg("❌ " + e.message, "err"));
-window.addEventListener("unhandledrejection", (e) =>
-  dbg("❌ Promise：" + (e.reason?.message || e.reason), "err")
-);
+function dbgError(label, err) {
+  const msg = err && err.message ? err.message : String(err);
+  const stack = err && err.stack ? err.stack.split("\n").slice(0, 4).join(" | ") : "";
+  dbg(`❌ ${label}：${msg}${stack ? "  →  " + stack : ""}`, "err");
+}
+
+window.addEventListener("error", (e) => {
+  const info = [];
+  if (e.message) info.push(e.message);
+  if (e.filename) info.push(`@${e.filename}:${e.lineno}:${e.colno}`);
+  dbg("❌ " + (info.join(" ") || "未知錯誤"), "err");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  dbgError("Promise", e.reason);
+});
 
 /* =========================================================
    API 層
@@ -990,7 +986,7 @@ const USER_ICON = L.divIcon({
 });
 
 /* =========================================================
-   最愛儲存（雙層備援：localStorage + cookie）
+   最愛儲存（雙層備援）
    ========================================================= */
 const FAV_STORAGE_KEY = "hk-bus-eta-favourites";
 const FAV_COOKIE_DAYS = 365;
