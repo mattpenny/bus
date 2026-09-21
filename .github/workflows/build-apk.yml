@@ -31,7 +31,7 @@ jobs:
       - name: Capacitor init
         run: |
           if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then
-            npx cap init "Ansum Bus" "com.ansum.bus" --web-dir=.
+            npx cap init "Ansum Bus" "com.ansum.bus" --web-dir=www
           fi
 
       - name: Add Android platform
