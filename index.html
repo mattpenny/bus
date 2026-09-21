@@ -10,6 +10,9 @@
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 <style>
+  :root {
+    --font-scale: 1;
+  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; height: 100%; overflow-x: hidden; }
   body {
@@ -29,7 +32,7 @@
     min-width: 0;
   }
   header.app-header h1 {
-    margin: 0; font-size: 17px; white-space: nowrap;
+    margin: 0; font-size: calc(17px * var(--font-scale)); white-space: nowrap;
     display: flex; align-items: center; gap: 9px;
     min-width: 0; overflow: hidden;
   }
@@ -43,23 +46,38 @@
     width: 24px; height: 24px; flex-shrink: 0;
     object-fit: contain; display: block;
   }
-  header.app-header p { margin: 0; font-size: 11px; opacity: 0.75; flex-shrink: 0; }
+  header.app-header p { margin: 0; font-size: calc(11px * var(--font-scale)); opacity: 0.75; flex-shrink: 0; }
   header.app-header .header-meta {
     display: flex; align-items: center; gap: 12px;
     flex-shrink: 0; min-width: 0;
   }
   header.app-header .header-clock {
-    font-size: 14px; font-weight: 600; letter-spacing: 0.4px;
+    font-size: calc(14px * var(--font-scale)); font-weight: 600; letter-spacing: 0.4px;
     font-variant-numeric: tabular-nums; opacity: 0.95;
     white-space: nowrap; flex-shrink: 0;
   }
+
+  /* 字體放大 controls */
+  .font-size-controls {
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+  }
+  .font-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.15); color: white; font-size: 16px; font-weight: 700;
+    line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    user-select: none; transition: background 0.15s;
+  }
+  .font-btn:hover { background: rgba(255,255,255,0.3); }
+  .font-btn:active { transform: scale(0.95); }
+
   @media (max-width: 600px) {
     header.app-header { padding: 8px 12px; }
-    header.app-header h1 { font-size: 15px; }
+    header.app-header h1 { font-size: calc(15px * var(--font-scale)); }
     header.app-header .header-logo-badge { width: 30px; height: 30px; }
     header.app-header .header-logo { width: 21px; height: 21px; }
     header.app-header p { display: none; }
-    header.app-header .header-clock { font-size: 13px; }
+    header.app-header .header-clock { font-size: calc(13px * var(--font-scale)); }
+    .font-btn { width: 26px; height: 26px; font-size: 14px; }
   }
 
   .layout {
@@ -85,10 +103,10 @@
 
   .fav-section { margin-bottom: 14px; min-width: 0; }
   .fav-section .title {
-    font-size: 13px; color: #333; margin-bottom: 6px;
+    font-size: calc(13px * var(--font-scale)); color: #333; margin-bottom: 6px;
     display: flex; align-items: center; gap: 6px;
   }
-  .fav-section .title .star { color: #f9a825; font-size: 14px; }
+  .fav-section .title .star { color: #f9a825; font-size: calc(14px * var(--font-scale)); }
   .fav-slots {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -113,20 +131,20 @@
   }
   .fav-slot.filled:active { background: #dbe9ff; transform: scale(0.97); }
   .fav-slot .fav-route {
-    font-size: 16px; font-weight: 800; line-height: 1;
+    font-size: calc(16px * var(--font-scale)); font-weight: 800; line-height: 1;
     letter-spacing: -0.3px;
     max-width: 100%; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
   }
   .fav-slot .fav-company {
-    font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+    font-size: calc(9px * var(--font-scale)); font-weight: 700; letter-spacing: 0.5px;
     padding: 1px 5px; border-radius: 8px;
     background: rgba(26,61,124,0.12); color: #1a3d7c;
     max-width: 100%; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
   }
   .fav-slot .fav-dest {
-    font-size: 9.5px; font-weight: 500;
+    font-size: calc(9.5px * var(--font-scale)); font-weight: 500;
     line-height: 1.15; color: #555;
     max-width: 100%; overflow: hidden;
     text-overflow: ellipsis;
@@ -134,8 +152,8 @@
     -webkit-box-orient: vertical;
     word-break: break-word;
   }
-  .fav-slot .fav-plus { font-size: 22px; line-height: 1; color: #1a3d7c; opacity: 0.5; }
-  .fav-slot .fav-hint { font-size: 10px; color: #999; }
+  .fav-slot .fav-plus { font-size: calc(22px * var(--font-scale)); line-height: 1; color: #1a3d7c; opacity: 0.5; }
+  .fav-slot .fav-hint { font-size: calc(10px * var(--font-scale)); color: #999; }
   .fav-slot .fav-remove {
     position: absolute; top: -6px; right: -6px;
     width: 20px; height: 20px; border-radius: 50%;
@@ -154,7 +172,7 @@
     margin-bottom: 10px; min-width: 0;
   }
   .row label {
-    font-size: 13px; color: #333;
+    font-size: calc(13px * var(--font-scale)); color: #333;
     min-width: 60px; flex-shrink: 0;
   }
   input[type="text"] {
@@ -162,11 +180,11 @@
     min-width: 0; width: 0;
     padding: 8px 10px;
     border: 1px solid #ccd; border-radius: 6px;
-    font-size: 14px; background: white;
+    font-size: calc(14px * var(--font-scale)); background: white;
   }
   input[type="text"]:focus { outline: 2px solid #1a3d7c; border-color: #1a3d7c; }
 
-  .company-label { font-size: 13px; color: #333; margin-bottom: 6px; }
+  .company-label { font-size: calc(13px * var(--font-scale)); color: #333; margin-bottom: 6px; }
   .company-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -193,24 +211,24 @@
     width: 100%; max-width: 72px; height: 36px;
     object-fit: contain; pointer-events: none;
   }
-  .company-btn .name { font-size: 10px; color: #555; font-weight: 600; }
+  .company-btn .name { font-size: calc(10px * var(--font-scale)); color: #555; font-weight: 600; }
 
-  h3 { margin: 0 0 8px; font-size: 14px; }
-  h3 small { color: #666; font-weight: normal; font-size: 12px; }
+  h3 { margin: 0 0 8px; font-size: calc(14px * var(--font-scale)); }
+  h3 small { color: #666; font-weight: normal; font-size: calc(12px * var(--font-scale)); }
 
   .direction-row {
     display: flex; align-items: center; gap: 6px;
     margin-bottom: 8px; min-width: 0;
   }
   .direction-row .label {
-    font-size: 14px; font-weight: 600; color: #333; flex-shrink: 0;
+    font-size: calc(14px * var(--font-scale)); font-weight: 600; color: #333; flex-shrink: 0;
   }
   .direction-chip {
     flex: 1 1 0; min-width: 0;
     padding: 8px 12px;
     border: 1px solid #1a3d7c; border-radius: 8px;
     background: #eaf1ff; color: #1a3d7c;
-    font-size: 13px; font-weight: 600; cursor: pointer;
+    font-size: calc(13px * var(--font-scale)); font-weight: 600; cursor: pointer;
     text-align: center; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis;
     transition: background 0.15s;
@@ -222,7 +240,7 @@
     padding: 8px 10px;
     border: 1px solid #1a3d7c; border-radius: 8px;
     background: white; color: #1a3d7c;
-    font-size: 18px; line-height: 1;
+    font-size: calc(18px * var(--font-scale)); line-height: 1;
     cursor: pointer; flex-shrink: 0;
     transition: all 0.15s;
   }
@@ -235,7 +253,7 @@
   .direction-picker li {
     padding: 9px 11px; border: 1px solid #dde;
     border-radius: 6px; margin-bottom: 5px;
-    cursor: pointer; font-size: 13px;
+    cursor: pointer; font-size: calc(13px * var(--font-scale));
     display: flex; justify-content: space-between;
     align-items: center; gap: 6px; background: white;
     min-width: 0;
@@ -259,7 +277,7 @@
   .stop-list ul { list-style: none; padding: 0; margin: 0; }
   .stop-list li {
     padding: 8px 10px; border-bottom: 1px solid #eef;
-    cursor: pointer; font-size: 13px;
+    cursor: pointer; font-size: calc(13px * var(--font-scale));
     transition: background 0.15s;
     display: flex; justify-content: space-between;
     align-items: center; gap: 6px;
@@ -275,7 +293,7 @@
     text-overflow: ellipsis; white-space: nowrap;
   }
   .stop-list .distance {
-    font-size: 11px; color: #27ae60; background: #e8f8ee;
+    font-size: calc(11px * var(--font-scale)); color: #27ae60; background: #e8f8ee;
     padding: 2px 6px; border-radius: 10px;
     font-weight: 600; flex-shrink: 0;
   }
@@ -283,13 +301,13 @@
 
   .status { display: none; }
 
-  .hint { color: #999; font-size: 13px; padding: 6px 0; word-break: break-word; }
-  .error { color: #c0392b; font-size: 12px; margin-top: 6px; word-break: break-word; }
-  .loading { color: #1a3d7c; font-size: 12px; padding: 4px 0; }
+  .hint { color: #999; font-size: calc(13px * var(--font-scale)); padding: 6px 0; word-break: break-word; }
+  .error { color: #c0392b; font-size: calc(12px * var(--font-scale)); margin-top: 6px; word-break: break-word; }
+  .loading { color: #1a3d7c; font-size: calc(12px * var(--font-scale)); padding: 4px 0; }
 
   .search-btn {
     padding: 8px 14px; border: none; border-radius: 6px;
-    background: #1a3d7c; color: white; font-size: 13px;
+    background: #1a3d7c; color: white; font-size: calc(13px * var(--font-scale));
     font-weight: 600; cursor: pointer; flex-shrink: 0;
     transition: background 0.15s;
   }
@@ -341,7 +359,7 @@
     flex-wrap: wrap;
   }
   .eta-header h3 small {
-    color: #666; font-weight: normal; font-size: 12px;
+    color: #666; font-weight: normal; font-size: calc(12px * var(--font-scale));
     min-width: 0; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
   }
@@ -351,7 +369,7 @@
     border: 1px solid #ccd; border-radius: 6px;
     background: white;
     color: #1a3d7c;
-    font-size: 12px;
+    font-size: calc(12px * var(--font-scale));
     font-weight: 600;
     cursor: pointer;
     flex-shrink: 0;
@@ -374,16 +392,16 @@
     min-width: 0;
   }
   .eta-box li:last-child { border-bottom: none; }
-  .eta-box .rank { width: 65px; color: #555; font-size: 12px; flex-shrink: 0; }
+  .eta-box .rank { width: 65px; color: #555; font-size: calc(12px * var(--font-scale)); flex-shrink: 0; }
   .eta-box .time {
-    font-size: 20px; font-weight: 700; color: #1a3d7c; flex-shrink: 0;
+    font-size: calc(20px * var(--font-scale)); font-weight: 700; color: #1a3d7c; flex-shrink: 0;
     display: flex; align-items: baseline; gap: 6px;
   }
   .eta-box .exact-time {
-    font-size: 14px; font-weight: 500; color: #666;
+    font-size: calc(20px * var(--font-scale)); font-weight: 700; color: #1a3d7c;
   }
   .eta-box .remark {
-    font-size: 12px; color: #e67e22; margin-left: auto;
+    font-size: calc(12px * var(--font-scale)); color: #e67e22; margin-left: auto;
     min-width: 0; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
   }
@@ -398,11 +416,11 @@
     flex-wrap: wrap;
   }
   .eta-box .age {
-    font-size: 11px; color: #888;
+    font-size: calc(11px * var(--font-scale)); color: #888;
     display: flex; align-items: center;
   }
   .eta-box .countdown {
-    font-size: 11px; color: #1a3d7c;
+    font-size: calc(11px * var(--font-scale)); color: #1a3d7c;
     display: flex; align-items: center; gap: 4px;
     font-weight: 600;
   }
@@ -464,38 +482,38 @@
     .map-row-mobile .pin { font-size: 18px; flex-shrink: 0; }
     .map-row-mobile .text {
       flex: 1 1 0; min-width: 0;
-      font-size: 13px; color: #333; font-weight: 600;
+      font-size: calc(13px * var(--font-scale)); color: #333; font-weight: 600;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .map-row-mobile .hint-tap {
-      font-size: 11px; color: #888; flex-shrink: 0;
+      font-size: calc(11px * var(--font-scale)); color: #888; flex-shrink: 0;
     }
 
     .eta-box { max-height: 220px; padding: 8px 12px; }
-    .eta-box .time { font-size: 18px; }
-    .eta-box .exact-time { font-size: 13px; }
-    .eta-box .rank { width: 55px; font-size: 11px; }
-    .eta-header h3 small { font-size: 11px; }
+    .eta-box .time { font-size: calc(18px * var(--font-scale)); }
+    .eta-box .exact-time { font-size: calc(18px * var(--font-scale)); }
+    .eta-box .rank { width: 55px; font-size: calc(11px * var(--font-scale)); }
+    .eta-header h3 small { font-size: calc(11px * var(--font-scale)); }
 
     .stop-list { max-height: 60vh; }
 
     .row label { min-width: 60px; }
     .row input[type="text"] {
-      font-size: 16px; padding: 10px 12px;
+      font-size: calc(16px * var(--font-scale)); padding: 10px 12px;
       flex: 1 1 0; min-width: 0; width: 0;
     }
     .row .search-btn {
-      padding: 11px 14px; font-size: 14px; border-radius: 8px;
+      padding: 11px 14px; font-size: calc(14px * var(--font-scale)); border-radius: 8px;
       flex-shrink: 0;
     }
 
     @media (max-width: 380px) {
       .layout { padding: 6px; gap: 6px; }
       .panel { padding: 8px; }
-      .row label { min-width: 50px; font-size: 12px; }
-      .row .search-btn { padding: 10px 10px; font-size: 13px; }
-      .fav-slot .fav-route { font-size: 14px; }
-      .fav-slot .fav-dest { font-size: 9px; }
+      .row label { min-width: 50px; font-size: calc(12px * var(--font-scale)); }
+      .row .search-btn { padding: 10px 10px; font-size: calc(13px * var(--font-scale)); }
+      .fav-slot .fav-route { font-size: calc(14px * var(--font-scale)); }
+      .fav-slot .fav-dest { font-size: calc(9px * var(--font-scale)); }
       .company-sheet .company-btn img { height: 36px; max-width: 74px; }
     }
   }
@@ -531,7 +549,7 @@
       flex-shrink: 0; gap: 10px;
     }
     .map-overlay-header .title {
-      font-size: 14px; font-weight: 600; flex: 1 1 0;
+      font-size: calc(14px * var(--font-scale)); font-weight: 600; flex: 1 1 0;
       min-width: 0; white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis;
     }
@@ -572,8 +590,8 @@
       gap: 10px; padding: 12px 16px;
       background: #1a3d7c; color: white;
     }
-    .company-sheet-header .title { font-size: 15px; font-weight: 700; }
-    .company-sheet-header .sub { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+    .company-sheet-header .title { font-size: calc(15px * var(--font-scale)); font-weight: 700; }
+    .company-sheet-header .sub { font-size: calc(11px * var(--font-scale)); opacity: 0.8; margin-top: 2px; }
     .company-sheet-header .close-btn {
       flex-shrink: 0; width: 36px; height: 36px;
       border: none; border-radius: 10px;
@@ -586,10 +604,10 @@
     .company-sheet .company-row { margin-bottom: 0; gap: 10px; }
     .company-sheet .company-btn { padding: 14px 6px; }
     .company-sheet .company-btn img { height: 42px; max-width: 88px; }
-    .company-sheet .company-btn .name { font-size: 12px; }
+    .company-sheet .company-btn .name { font-size: calc(12px * var(--font-scale)); }
     .company-sheet-hint {
       margin-top: 10px; text-align: center;
-      font-size: 11px; color: #888;
+      font-size: calc(11px * var(--font-scale)); color: #888;
     }
   }
 
@@ -610,6 +628,10 @@
       Ansum Bus
     </h1>
     <div class="header-meta">
+      <div class="font-size-controls">
+        <button class="font-btn" @click="decreaseFontSize" title="縮小字型">−</button>
+        <button class="font-btn" @click="increaseFontSize" title="放大字型">+</button>
+      </div>
       <span class="header-clock" title="現在時間">{{ clockText }}</span>
       <p>資料來源：資料一線通 · 地圖：地政總署 CSDI</p>
     </div>
@@ -639,7 +661,7 @@
             </template>
           </div>
         </div>
-        <div class="hint" style="font-size:11px; padding:4px 0 0;">
+        <div class="hint" style="font-size:calc(11px * var(--font-scale)); padding:4px 0 0;">
           提示：搜尋路線後，按 ☆ 加入最愛
         </div>
       </div>
@@ -668,7 +690,7 @@
         <button class="search-btn" @click="onSearch">查詢</button>
       </div>
 
-      <div v-if="isMobile" class="hint" style="font-size:11px; padding:0 0 6px;">
+      <div v-if="isMobile" class="hint" style="font-size:calc(11px * var(--font-scale)); padding:0 0 6px;">
         提示：輸入路線後按「查詢」，再選巴士公司
       </div>
 
@@ -1237,6 +1259,21 @@ const NLB_LOGO = "data:image/svg+xml;utf8," + encodeURIComponent(`
    ========================================================= */
 createApp({
   setup() {
+    const fontScale = ref(1);
+
+    function updateFontScale(newScale) {
+      fontScale.value = Math.min(Math.max(newScale, 0.8), 1.6);
+      document.documentElement.style.setProperty('--font-scale', fontScale.value);
+    }
+
+    function increaseFontSize() {
+      updateFontScale(fontScale.value + 0.1);
+    }
+
+    function decreaseFontSize() {
+      updateFontScale(fontScale.value - 0.1);
+    }
+
     const companies = [
       { id: "KMB", name: "九巴",
         logo: "data:image/svg+xml;utf8," + encodeURIComponent(
@@ -1954,6 +1991,7 @@ createApp({
     });
 
     return {
+      fontScale, increaseFontSize, decreaseFontSize,
       companies, company, routeInput, lastSearched, searched,
       allRoutes, matchedRoutes, routeKey, stops, selectedStop, etas,
       dataAge, countdown, refreshing, clockText,
