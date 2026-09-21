@@ -271,7 +271,9 @@
   }
   .stop-list li.active .distance { background: #ffd5d5; color: #c0392b; }
 
-  .status { font-size: 11px; color: #888; margin: 4px 0 8px; word-break: break-word; }
+  /* 狀態列：隱藏（改由下方其他 UI 顯示資訊） */
+  .status { display: none; }
+
   .hint { color: #999; font-size: 13px; padding: 6px 0; word-break: break-word; }
   .error { color: #c0392b; font-size: 12px; margin-top: 6px; word-break: break-word; }
   .loading { color: #1a3d7c; font-size: 12px; padding: 4px 0; }
@@ -410,27 +412,11 @@
   }
   @keyframes freshBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-  .debug-toggle {
-    position: fixed; bottom: 10px; right: 10px;
-    background: #333; color: #0f0;
-    padding: 6px 12px; border-radius: 20px;
-    font-size: 12px; cursor: pointer;
-    z-index: 9999; opacity: 0.6;
-  }
-  .debug-toggle:hover { opacity: 1; }
-  #debug-panel {
-    position: fixed; bottom: 50px; right: 10px;
-    width: 90vw; max-width: 440px; max-height: 40vh;
-    overflow: auto; background: #111; color: #0f0;
-    font-family: monospace; font-size: 11px;
-    padding: 10px; border-radius: 8px; z-index: 9999;
-    display: none; white-space: pre-wrap; line-height: 1.4;
-    word-break: break-all;
-  }
-  #debug-panel.show { display: block; }
-  #debug-panel .err { color: #f55; }
-  #debug-panel .ok { color: #0f0; }
-  #debug-panel .info { color: #0af; }
+  /* Bug 圖示：隱藏 */
+  .debug-toggle { display: none !important; }
+
+  /* 隱藏後 debug 面板也一併隱藏，避免殘留 */
+  #debug-panel { display: none !important; }
 
   @keyframes busPulse {
     0% { transform: scale(1); }
@@ -671,6 +657,7 @@
         提示：輸入路線後按「查詢」，再選巴士公司
       </div>
 
+      <!-- 狀態列：隱藏 (CSS: .status { display: none }) -->
       <div class="status">狀態：{{ statusText }}</div>
 
       <div class="map-row-mobile" @click="expandMap">
@@ -828,6 +815,7 @@
     </div>
   </Teleport>
 
+  <!-- Bug 圖示：隱藏 (CSS: .debug-toggle { display: none }) -->
   <div class="debug-toggle" @click="showDebug = !showDebug">🐞</div>
   <div id="debug-panel" :class="{ show: showDebug }"></div>
 </div>
@@ -835,30 +823,19 @@
 <script>
 const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
+/* Debug 訊息寫到隱藏的 console；保留函式避免呼叫端報錯 */
 function dbg(msg, cls = "info") {
-  const time = new Date().toLocaleTimeString();
-  const el = document.getElementById("debug-panel");
-  if (el) {
-    const d = document.createElement("div");
-    d.className = cls;
-    d.textContent = `[${time}] ${msg}`;
-    el.appendChild(d);
-    el.scrollTop = el.scrollHeight;
-  }
-  console.log(`[${time}] ${msg}`);
+  console.log(`[${new Date().toLocaleTimeString()}] ${msg}`);
 }
 
 function dbgError(label, err) {
   const msg = err && err.message ? err.message : String(err);
-  const stack = err && err.stack ? err.stack.split("\n").slice(0, 4).join(" | ") : "";
-  dbg(`❌ ${label}：${msg}${stack ? "  →  " + stack : ""}`, "err");
+  console.error(`[${new Date().toLocaleTimeString()}] ❌ ${label}：${msg}`);
+  if (err && err.stack) console.error(err.stack);
 }
 
 window.addEventListener("error", (e) => {
-  const info = [];
-  if (e.message) info.push(e.message);
-  if (e.filename) info.push(`@${e.filename}:${e.lineno}:${e.colno}`);
-  dbg("❌ " + (info.join(" ") || "未知錯誤"), "err");
+  console.error(`[${new Date().toLocaleTimeString()}] ❌ ${e.message} @${e.filename}:${e.lineno}:${e.colno}`);
 });
 window.addEventListener("unhandledrejection", (e) => {
   dbgError("Promise", e.reason);
@@ -871,13 +848,8 @@ const KMB_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 
 async function getJSON(url) {
-  const t0 = performance.now();
   const res = await fetch(url);
-  const ms = Math.round(performance.now() - t0);
-  if (!res.ok) {
-    dbg(`✗ HTTP ${res.status} (${ms}ms) ${url}`, "err");
-    throw new Error("HTTP " + res.status);
-  }
+  if (!res.ok) throw new Error("HTTP " + res.status);
   return res.json();
 }
 
@@ -1157,9 +1129,6 @@ function loadFavouritesFromStorage() {
   return best;
 }
 
-/* =========================================================
-   自動更新設定：每 30 秒更新一次
-   ========================================================= */
 const AUTO_REFRESH_INTERVAL = 30;
 
 /* =========================================================
@@ -1206,17 +1175,10 @@ createApp({
 
     function saveFavourites() {
       const json = JSON.stringify(favourites.value);
-      let lsOk = false;
       try {
         localStorage.setItem(FAV_STORAGE_KEY, json);
-        lsOk = true;
-      } catch (e) {
-        dbg("localStorage 儲存失敗：" + e.message, "err");
-      }
-      const ckOk = writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
-      if (!lsOk && !ckOk) {
-        dbg("⚠️ 最愛無法持久化儲存（localStorage 與 cookie 均失敗）", "err");
-      }
+      } catch (e) {}
+      writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
     }
 
     const matchedRoutes = computed(() => {
@@ -1284,7 +1246,6 @@ createApp({
         if (token !== loadToken) return;
         error.value = "無法載入路線清單：" + e.message;
         statusText.value = "路線清單載入失敗";
-        dbg("loadRoutes 失敗：" + e.message, "err");
       }
     }
 
@@ -1295,10 +1256,7 @@ createApp({
     }
 
     async function searchRoute(q, autoDirectionKey = null) {
-      if (!q) {
-        statusText.value = "請輸入路線號碼";
-        return;
-      }
+      if (!q) { statusText.value = "請輸入路線號碼"; return; }
       if (!allRoutes.value.length) {
         statusText.value = "路線清單尚未載入完成，請稍候再試";
         return;
@@ -1341,10 +1299,7 @@ createApp({
 
     function onSearch() {
       const q = (routeInput.value || "").trim();
-      if (!q) {
-        statusText.value = "請輸入巴士路線號碼";
-        return;
-      }
+      if (!q) { statusText.value = "請輸入巴士路線號碼"; return; }
       if (isMobile.value) {
         statusText.value = `請選擇「${q}」的巴士公司`;
         showCompanyPicker.value = true;
@@ -1425,7 +1380,6 @@ createApp({
         await autoLocateNearestStop();
       } catch (e) {
         error.value = "無法載入巴士站：" + e.message;
-        dbg("selectDirection 失敗：" + e.message, "err");
       } finally {
         loadingStops.value = false;
       }
@@ -1486,7 +1440,6 @@ createApp({
         return;
       }
 
-      dbg(`載入最愛：${fav.company} ${fav.route} ${fav.label || ''}`, "info");
       statusText.value = `載入最愛 ${fav.route}…`;
 
       if (company.value !== fav.company) {
@@ -1591,9 +1544,6 @@ createApp({
       await applySelection(stop);
     }
 
-    /* =========================================================
-       ETA 更新（含自動倒數）
-       ========================================================= */
     async function refreshEta(manual = false) {
       const stop = selectedStop.value;
       if (!stop) return;
@@ -1613,12 +1563,10 @@ createApp({
         }
         etas.value = result.items;
         dataAge.value = result.ageSeconds;
-        if (manual) dbg("手動更新完成", "ok");
       } catch (e) {
         etas.value = [];
         dataAge.value = null;
         error.value = "無法取得 ETA：" + e.message;
-        dbgError("refreshEta", e);
       } finally {
         refreshing.value = false;
         countdown.value = AUTO_REFRESH_INTERVAL;
@@ -1627,7 +1575,6 @@ createApp({
 
     function manualRefresh() {
       if (refreshing.value) return;
-      dbg("手動更新 ETA", "info");
       refreshEta(true);
     }
 
@@ -1750,10 +1697,7 @@ createApp({
       await new Promise((r) => requestAnimationFrame(() => r()));
 
       const container = document.getElementById("map-mobile");
-      if (!container) {
-        dbg("找不到 #map-mobile 容器", "err");
-        return;
-      }
+      if (!container) return;
 
       try {
         if (!mapMobile) {
@@ -1840,9 +1784,6 @@ createApp({
       try { saveFavourites(); } catch (e) {}
     }
 
-    /* =========================================================
-       每 1 秒 tick：更新倒數 + 資料年齡
-       ========================================================= */
     let tickTimer = null;
 
     function tick() {
@@ -1867,7 +1808,6 @@ createApp({
 
     function handleVisibility() {
       if (document.visibilityState === "visible" && selectedStop.value) {
-        dbg("回到前景，立即更新 ETA", "info");
         refreshEta();
       }
       if (document.visibilityState === "hidden") {
@@ -1884,8 +1824,6 @@ createApp({
       document.addEventListener("visibilitychange", handleVisibility);
 
       tickTimer = setInterval(tick, 1000);
-
-      dbg(`應用已啟動（ETA 每 ${AUTO_REFRESH_INTERVAL} 秒自動更新）`, "ok");
     });
 
     onUnmounted(() => {
