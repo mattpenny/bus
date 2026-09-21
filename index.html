@@ -528,7 +528,6 @@
       font-size: 11px; color: #888;
     }
 
-    /* 手機搜尋列：加大觸控目標、避免 iOS 聚焦縮放 */
     .row label { min-width: 64px; }
     .row input[type="text"] { font-size: 16px; padding: 11px 12px; }
     .row .search-btn { padding: 12px 18px; font-size: 14px; border-radius: 8px; }
@@ -556,9 +555,7 @@
   <div class="layout">
     <aside class="panel sidebar">
 
-      <!-- =========================================================
-           我的最愛
-           ========================================================= -->
+      <!-- 我的最愛 -->
       <div class="fav-section">
         <div class="title"><span class="star">⭐</span>我的最愛</div>
         <div class="fav-slots">
@@ -587,7 +584,6 @@
 
       <hr class="fav-divider" />
 
-      <!-- 巴士公司：桌面版內嵌選擇；手機版改由「查詢」彈出選擇 -->
       <div v-if="!isMobile">
         <div class="company-label">巴士公司</div>
         <div class="company-row">
@@ -616,14 +612,12 @@
 
       <div class="status">狀態：{{ statusText }}</div>
 
-      <!-- 地圖列（mobile only） -->
       <div class="map-row-mobile" @click="expandMap">
         <span class="pin">📍</span>
         <span class="text">{{ mapRowText }}</span>
         <span class="hint-tap">點擊放大地圖</span>
       </div>
 
-      <!-- 方向區塊 -->
       <div v-if="!selectedDirectionLabel || pickingDirection">
         <div v-if="matchedRoutes.length > 1" class="direction-row">
           <span class="label">方向</span>
@@ -727,9 +721,6 @@
     </div>
   </Teleport>
 
-  <!-- =========================================================
-       手機版：巴士公司選擇彈窗
-       ========================================================= -->
   <Teleport to="body">
     <div v-if="showCompanyPicker" class="company-overlay" @click.self="closeCompanyPicker">
       <div class="company-sheet">
@@ -980,16 +971,43 @@ const USER_ICON = L.divIcon({
 });
 
 /* =========================================================
-   最愛儲存
+   最愛儲存（雙層備援）
+   localStorage（主要）+ cookie（備援）
+   兩者同時寫入，讀取時選較完整的一份
    ========================================================= */
 const FAV_STORAGE_KEY = "hk-bus-eta-favourites";
+const FAV_COOKIE_DAYS = 365;
 
-function loadFavouritesFromStorage() {
+function readCookie(name) {
   try {
-    const raw = localStorage.getItem(FAV_STORAGE_KEY);
-    if (!raw) return [null, null, null];
+    const pattern = new RegExp(
+      "(?:^|; )" + name.replace(/([.$?*|{}()\[\]\\\/\+^])/g, "\\$1") + "=([^;]*)"
+    );
+    const m = document.cookie.match(pattern);
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeCookie(name, value, days) {
+  try {
+    const expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie =
+      name + "=" + encodeURIComponent(value) +
+      "; expires=" + expires +
+      "; path=/; SameSite=Lax";
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function parseFavArray(raw) {
+  if (!raw) return null;
+  try {
     const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return [null, null, null];
+    if (!Array.isArray(arr)) return null;
     const result = [null, null, null];
     for (let i = 0; i < 3; i++) {
       const item = arr[i];
@@ -999,9 +1017,39 @@ function loadFavouritesFromStorage() {
     }
     return result;
   } catch (e) {
-    console.warn("無法讀取最愛", e);
-    return [null, null, null];
+    return null;
   }
+}
+
+function loadFavouritesFromStorage() {
+  let fromLS = null;
+  try {
+    fromLS = parseFavArray(localStorage.getItem(FAV_STORAGE_KEY));
+  } catch (e) {
+    console.warn("localStorage 讀取失敗", e);
+  }
+  const fromCookie = parseFavArray(readCookie(FAV_STORAGE_KEY));
+
+  const countLS = fromLS ? fromLS.filter(Boolean).length : 0;
+  const countCookie = fromCookie ? fromCookie.filter(Boolean).length : 0;
+
+  let best = null;
+  if (fromLS && fromCookie) {
+    best = countLS >= countCookie ? fromLS : fromCookie;
+  } else {
+    best = fromLS || fromCookie || null;
+  }
+  if (!best) return [null, null, null];
+
+  // 同步另一邊
+  const json = JSON.stringify(best);
+  if (best === fromCookie && !fromLS) {
+    try { localStorage.setItem(FAV_STORAGE_KEY, json); } catch (e) {}
+  }
+  if (best === fromLS && !fromCookie) {
+    writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
+  }
+  return best;
 }
 
 /* =========================================================
@@ -1042,14 +1090,22 @@ createApp({
     const isMobile = ref(window.matchMedia("(max-width: 900px)").matches);
     const showCompanyPicker = ref(false);
 
-    /* 最愛：3 個 slot，null 為空 */
     const favourites = ref(loadFavouritesFromStorage());
 
     function saveFavourites() {
+      const json = JSON.stringify(favourites.value);
+      let lsOk = false;
       try {
-        localStorage.setItem(FAV_STORAGE_KEY, JSON.stringify(favourites.value));
+        localStorage.setItem(FAV_STORAGE_KEY, json);
+        lsOk = true;
       } catch (e) {
-        dbg("無法儲存最愛：" + e.message, "err");
+        dbg("localStorage 儲存失敗：" + e.message, "err");
+      }
+      const ckOk = writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
+      if (!lsOk && !ckOk) {
+        dbg("⚠️ 最愛無法持久化儲存（localStorage 與 cookie 均失敗）", "err");
+      } else {
+        dbg(`最愛已儲存（LS:${lsOk ? "✓" : "✗"} Cookie:${ckOk ? "✓" : "✗"}）`, "ok");
       }
     }
 
@@ -1076,7 +1132,6 @@ createApp({
     }
     const selectedRoute = computed(() => findCurrentRoute());
 
-    /* 目前的方向是否已在最愛中 */
     const isCurrentFavourite = computed(() => {
       if (!routeKey.value) return false;
       return favourites.value.some(f =>
@@ -1084,10 +1139,6 @@ createApp({
       );
     });
 
-    /* =========================================================
-       載入路線清單
-       ========================================================= */
-    /* 以 token 丟棄過期的路線清單回應（避免切換公司時舊回應覆蓋新清單） */
     let loadToken = 0;
 
     async function loadRoutes() {
@@ -1132,9 +1183,6 @@ createApp({
       loadRoutes();
     }
 
-    /* =========================================================
-       查詢路線（可選 autoDirectionKey 自動選方向）
-       ========================================================= */
     async function searchRoute(q, autoDirectionKey = null) {
       if (!q) {
         statusText.value = "請輸入路線號碼";
@@ -1185,26 +1233,19 @@ createApp({
         statusText.value = "請輸入巴士路線號碼";
         return;
       }
-
-      // 手機版：先彈出巴士公司選擇，選定公司後才查詢
       if (isMobile.value) {
         statusText.value = `請選擇「${q}」的巴士公司`;
         showCompanyPicker.value = true;
         return;
       }
-
       searchRoute(q);
     }
 
-    /* =========================================================
-       手機版：選定巴士公司後立即查詢（無需其他控制）
-       ========================================================= */
     async function onCompanyPick(id) {
       showCompanyPicker.value = false;
       const q = (routeInput.value || "").trim();
       if (!q) return;
 
-      // 換公司，或清單尚未載入完成（仍在載入／載入失敗）時，都要先確保清單就緒
       const changed = company.value !== id;
       if (changed) {
         company.value = id;
@@ -1272,26 +1313,20 @@ createApp({
       }
     }
 
-    /* =========================================================
-       我的最愛
-       ========================================================= */
     function toggleFavourite() {
       if (!routeKey.value || !selectedDirectionLabel.value) return;
 
-      // 已在最愛中 → 移除
       const existingIdx = favourites.value.findIndex(f =>
         f && f.company === company.value && f.directionKey === routeKey.value
       );
       if (existingIdx !== -1) {
         favourites.value[existingIdx] = null;
-        // 觸發陣列更新
         favourites.value = [...favourites.value];
         saveFavourites();
         statusText.value = "已從我的最愛移除";
         return;
       }
 
-      // 找空位
       const emptyIdx = favourites.value.findIndex(f => !f);
       if (emptyIdx === -1) {
         statusText.value = "我的最愛已滿，請按 ✕ 移除其中一個";
@@ -1336,20 +1371,15 @@ createApp({
       dbg(`載入最愛：${fav.company} ${fav.route} ${fav.label || ''}`, "info");
       statusText.value = `載入最愛 ${fav.route}…`;
 
-      // 1. 切換公司（若需要）
       if (company.value !== fav.company) {
         company.value = fav.company;
         await loadRoutes();
       }
 
-      // 2. 搜尋路線並自動選方向
       routeInput.value = fav.route;
       await searchRoute(fav.route, fav.directionKey);
     }
 
-    /* =========================================================
-       定位
-       ========================================================= */
     function getUserPosition() {
       return new Promise((resolve, reject) => {
         if (!("geolocation" in navigator)) {
@@ -1470,14 +1500,13 @@ createApp({
       return m + " 分鐘";
     }
 
-    /* ---------- 地圖 ---------- */
     let mapDesktop = null;
     let mapMobile  = null;
     let activeMap  = null;
     let activeMarkers = [];
     let activeRouteLine = null;
     let activeUserMarker = null;
-    let lastUserPos = null;   // 最後一次定位到的用戶位置（切換地圖時重新畫上）
+    let lastUserPos = null;
 
     function createMapOn(containerId) {
       const el = document.getElementById(containerId);
@@ -1532,7 +1561,6 @@ createApp({
         } catch (e) {}
       }
 
-      // 用戶目前位置：切換／重畫地圖後要重新畫上（否則手機版展開地圖時不會見到）
       if (lastUserPos && isValidCoord(lastUserPos.lat, lastUserPos.lng)) {
         showUserMarker(lastUserPos.lat, lastUserPos.lng);
       }
@@ -1551,7 +1579,7 @@ createApp({
     }
 
     function showUserMarker(lat, lng) {
-      lastUserPos = { lat: lat, lng: lng };   // 記低位置，切換／重畫地圖時可再畫
+      lastUserPos = { lat: lat, lng: lng };
       if (!activeMap || !isValidCoord(lat, lng)) return;
       if (activeUserMarker) activeMap.removeLayer(activeUserMarker);
       try {
@@ -1594,7 +1622,6 @@ createApp({
       drawOnActiveMap();
 
       if (selectedStop.value && lastUserPos && isValidCoord(lastUserPos.lat, lastUserPos.lng)) {
-        // 同時顯示用戶位置與選定車站
         try {
           mapMobile.fitBounds(
             [
@@ -1640,6 +1667,11 @@ createApp({
       }
     }
 
+    /* 離開或背景時再存一次（保險） */
+    function saveFavouritesOnExit() {
+      try { saveFavourites(); } catch (e) {}
+    }
+
     let timer = null;
     let ageTimer = null;
 
@@ -1647,6 +1679,12 @@ createApp({
       initMaps();
       loadRoutes();
       window.addEventListener("resize", handleResize);
+      // 當 App 進入背景或即將關閉時，強制再存一次最愛
+      window.addEventListener("beforeunload", saveFavouritesOnExit);
+      window.addEventListener("pagehide", saveFavouritesOnExit);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") saveFavouritesOnExit();
+      });
       timer = setInterval(() => { if (selectedStop.value) refreshEta(); }, 30000);
       ageTimer = setInterval(() => { if (dataAge.value !== null) dataAge.value += 1; }, 1000);
       dbg("應用已啟動", "ok");
@@ -1656,6 +1694,8 @@ createApp({
       clearInterval(timer);
       clearInterval(ageTimer);
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("beforeunload", saveFavouritesOnExit);
+      window.removeEventListener("pagehide", saveFavouritesOnExit);
     });
 
     return {
@@ -1665,7 +1705,8 @@ createApp({
       mapExpanded, mapRowText, pickingDirection, selectedDirectionLabel,
       isMobile, showCompanyPicker,
       favourites, isCurrentFavourite,
-      onCompanyChange, onSearch, onCompanyPick, closeCompanyPicker, selectDirection, onStopClick,
+      onCompanyChange, onSearch, onCompanyPick, closeCompanyPicker,
+      selectDirection, onStopClick,
       expandMap, collapseMap, zoomIn, zoomOut, clearDirection,
       toggleFavourite, removeFavourite, onFavClick,
       formatMinutes, formatDistance,
