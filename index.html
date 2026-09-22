@@ -475,7 +475,7 @@
   .map-zoom-btn:active { transform: scale(0.94); -webkit-transform: scale(0.94); background: #dbe9ff; }
 
   .eta-box {
-    padding: 10px 14px; max-height: 220px;
+    padding: 10px 14px; max-height: 260px;
     overflow-y: auto; flex-shrink: 0; min-width: 0;
     -webkit-overflow-scrolling: touch;
   }
@@ -493,6 +493,31 @@
     color: #666; font-weight: normal; font-size: calc(12px * var(--font-scale));
     min-width: 0; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* === 票價顯示 === */
+  .fare-line {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 0 8px;
+    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .fare-label {
+    font-size: calc(12px * var(--font-scale));
+    color: #888;
+    font-weight: 600;
+  }
+  .fare-value {
+    font-size: calc(18px * var(--font-scale));
+    font-weight: 800;
+    color: #e67e22;
+    font-variant-numeric: tabular-nums;
+  }
+  .fare-note {
+    font-size: calc(10px * var(--font-scale));
+    color: #aaa;
+    margin-left: auto;
   }
 
   .refresh-btn {
@@ -684,7 +709,7 @@
       width: 15px; height: 15px;
     }
 
-    .eta-box { max-height: 220px; padding: 8px 12px; }
+    .eta-box { max-height: 260px; padding: 8px 12px; }
     .eta-box .time { font-size: calc(18px * var(--font-scale)); }
     .eta-box .exact-time { font-size: calc(18px * var(--font-scale)); }
     .eta-box .rank { width: 68px; font-size: calc(18px * var(--font-scale)); }
@@ -1014,6 +1039,16 @@
           </button>
         </div>
 
+        <!-- === 票價顯示 === -->
+        <div v-if="currentFare !== null" class="fare-line">
+          <span class="fare-label">全程收費</span>
+          <span class="fare-value">${{ currentFare.toFixed(1) }}</span>
+          <span v-if="isHoliday && fareHoliday" class="fare-note">假日收費</span>
+          <span v-else-if="fareHoliday && fareHoliday !== currentFare" class="fare-note">
+            假日 ${{ fareHoliday.toFixed(1) }}
+          </span>
+        </div>
+
         <div v-if="!selectedStop" class="hint">請先選擇巴士站</div>
         <ul v-else>
           <li v-for="(e, i) in etas" :key="i">
@@ -1109,7 +1144,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 /* =========================================================
-   日期解析：Safari 比 Chrome 嚴格，需要多種 fallback
+   日期解析
    ========================================================= */
 function parseDate(input) {
   if (!input) return null;
@@ -1316,6 +1351,148 @@ function minutesUntil(iso) {
   const d = parseDate(iso);
   if (!d || isNaN(d.getTime())) return null;
   return Math.max(0, Math.round((d.getTime() - Date.now()) / 60000));
+}
+
+/* =========================================================
+   票價數據層（來自 hk-bus-crawling，每日更新）
+   ========================================================= */
+const FARE_CACHE_KEY = "hk-bus-fare-data";
+const FARE_CACHE_VERSION = 1;        // 變更結構時遞增以強制刷新
+const FARE_CACHE_DAYS = 7;            // 快取有效期（天）
+const FARE_URL_PRIMARY = "https://data.hkbus.app/routeFareList.min.json";
+const FARE_URL_FALLBACK = "https://hkbus.github.io/hk-bus-crawling/routeFareList.min.json";
+
+/* 票價記憶體快取：{ [routeId: string]: { fares: number[], faresHoliday: number[] } } */
+let fareDb = null;
+let fareDbLoading = null;
+
+function loadFareCacheFromStorage() {
+  try {
+    const raw = localStorage.getItem(FARE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.version !== FARE_CACHE_VERSION) return null;
+    const ageMs = Date.now() - (parsed.timestamp || 0);
+    if (ageMs > FARE_CACHE_DAYS * 864e5) return null;
+    return parsed.data || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveFareCacheToStorage(data) {
+  try {
+    localStorage.setItem(FARE_CACHE_KEY, JSON.stringify({
+      version: FARE_CACHE_VERSION,
+      timestamp: Date.now(),
+      data: data,
+    }));
+  } catch (e) { /* 容量不足時靜默失敗 */ }
+}
+
+/* 將原始 JSON 轉為精簡的 { routeKey: { fares, faresHoliday } } 映射 */
+function buildFareIndex(raw) {
+  const index = {};
+  // hk-bus-crawling 的 routeFareList 為 { [routeId]: { fares, faresHoliday, ... } }
+  const source = raw && raw.routeList ? raw.routeList : raw;
+  if (!source || typeof source !== "object") return index;
+
+  for (const routeId of Object.keys(source)) {
+    const entry = source[routeId];
+    if (!entry) continue;
+    const faresRaw = entry.fares;
+    const faresHolidayRaw = entry.faresHoliday;
+    if (!Array.isArray(faresRaw) && !Array.isArray(faresHolidayRaw)) continue;
+
+    const toNums = (arr) => {
+      if (!Array.isArray(arr)) return [];
+      return arr.map(v => parseFloat(v)).filter(v => Number.isFinite(v));
+    };
+
+    index[routeId] = {
+      fares: toNums(faresRaw),
+      faresHoliday: toNums(faresHolidayRaw),
+    };
+  }
+  return index;
+}
+
+async function fetchFareDb() {
+  if (fareDb) return fareDb;
+  if (fareDbLoading) return fareDbLoading;
+
+  fareDbLoading = (async () => {
+    // 1. 先檢查 localStorage 快取
+    const cached = loadFareCacheFromStorage();
+    if (cached) {
+      fareDb = cached;
+      return fareDb;
+    }
+
+    // 2. 網絡獲取（主源 → 備份源）
+    const urls = [FARE_URL_PRIMARY, FARE_URL_FALLBACK];
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) continue;
+        const raw = await res.json();
+        const index = buildFareIndex(raw);
+        if (Object.keys(index).length === 0) continue;
+        fareDb = index;
+        saveFareCacheToStorage(index);
+        return fareDb;
+      } catch (e) {
+        /* 嘗試下一個源 */
+      }
+    }
+    return null;
+  })();
+
+  try {
+    return await fareDbLoading;
+  } finally {
+    fareDbLoading = null;
+  }
+}
+
+/* 判斷今天是否為假日（周日或公眾假期）*/
+function isTodayHoliday() {
+  const d = new Date();
+  return d.getDay() === 0;  // 周日；公眾假期需額外判斷，此處簡化處理
+}
+
+/* 建立路線與票價的查找鍵值 */
+function buildFareLookupKeys(route, companyId) {
+  const keys = [];
+  const num = String(route || "").toUpperCase();
+
+  // hk-bus-crawling 的 routeId 常見格式："1+1+CHUK YUEN ESTATE+STAR FERRY"
+  // 我們無法從 ETA API 拿到完整 routeId，因此用「路線號 + 方向代碼」模糊匹配
+  // 退而求其次：直接嘗試以路線號匹配
+  keys.push(num);
+  keys.push(num + "+O");
+  keys.push(num + "+I");
+  keys.push(companyId.toLowerCase() + "+" + num);
+
+  return keys;
+}
+
+/* 從票價索引中查找指定路線的票價（嘗試多種鍵值格式）*/
+function lookupFare(routeNum) {
+  if (!fareDb) return null;
+  const num = String(routeNum || "").toUpperCase();
+  if (!num) return null;
+
+  // 直接命中
+  if (fareDb[num]) return fareDb[num];
+
+  // 前綴匹配（routeId 格式如 "1+1+..."）
+  for (const key of Object.keys(fareDb)) {
+    const firstPart = key.split("+")[0].toUpperCase();
+    if (firstPart === num) return fareDb[key];
+  }
+
+  return null;
 }
 
 /* =========================================================
@@ -1628,11 +1805,17 @@ createApp({
 
     const favourites = ref(loadFavouritesFromStorage());
 
+    /* === 票價狀態 === */
+    const currentFare = ref(null);
+    const fareHoliday = ref(null);
+
     const isLanding = computed(() => {
       return !searched.value
           && !routeInput.value.trim()
           && !stops.value.length;
     });
+
+    const isHoliday = computed(() => isTodayHoliday());
 
     function saveFavourites() {
       const json = JSON.stringify(favourites.value);
@@ -1718,6 +1901,35 @@ createApp({
       );
     });
 
+    /* === 載入當前路線的票價 === */
+    async function loadFareForCurrentRoute() {
+      currentFare.value = null;
+      fareHoliday.value = null;
+      const r = findCurrentRoute();
+      if (!r) return;
+
+      const db = await fetchFareDb();
+      if (!db) return;
+
+      const fareEntry = lookupFare(r.route);
+      if (!fareEntry) return;
+
+      const fares = fareEntry.fares || [];
+      const faresHolidayArr = fareEntry.faresHoliday || [];
+
+      if (fares.length) {
+        currentFare.value = fares[0];   // 全程成人票價
+      }
+      if (faresHolidayArr.length) {
+        fareHoliday.value = faresHolidayArr[0];
+      }
+
+      // 若今天是假日且假日票價存在，優先顯示假日票價
+      if (isHoliday.value && fareHoliday.value !== null) {
+        currentFare.value = fareHoliday.value;
+      }
+    }
+
     let loadToken = 0;
 
     async function loadRoutes() {
@@ -1730,6 +1942,8 @@ createApp({
       etas.value = [];
       dataAge.value = null;
       countdown.value = null;
+      currentFare.value = null;
+      fareHoliday.value = null;
       allRoutes.value = [];
       searched.value = false;
       mapExpanded.value = false;
@@ -1764,6 +1978,8 @@ createApp({
       etas.value = [];
       dataAge.value = null;
       countdown.value = null;
+      currentFare.value = null;
+      fareHoliday.value = null;
       error.value = "";
       mapExpanded.value = false;
       pickingDirection.value = false;
@@ -1826,6 +2042,8 @@ createApp({
           etas.value = [];
           dataAge.value = null;
           countdown.value = null;
+          currentFare.value = null;
+          fareHoliday.value = null;
           return;
         }
 
@@ -1879,6 +2097,8 @@ createApp({
       etas.value = [];
       dataAge.value = null;
       countdown.value = null;
+      currentFare.value = null;
+      fareHoliday.value = null;
     }
 
     async function selectDirection(r) {
@@ -1892,6 +2112,12 @@ createApp({
       etas.value = [];
       dataAge.value = null;
       countdown.value = null;
+      currentFare.value = null;
+      fareHoliday.value = null;
+
+      // 並行載入站點與票價
+      const farePromise = loadFareForCurrentRoute();
+
       try {
         let detailed = [];
         if (company.value === "NLB") {
@@ -1923,6 +2149,9 @@ createApp({
       } finally {
         loadingStops.value = false;
       }
+
+      // 確保票價已載入（不阻塞站點顯示）
+      await farePromise.catch(() => {});
     }
 
     function toggleFavourite() {
@@ -2020,10 +2249,6 @@ createApp({
       });
     }
 
-    /* =====================================================
-       用新陣列物件取代原有 stops，強制 Vue 重新渲染
-       —— 這可修正 Safari 不會因為純屬性新增而更新的問題
-       ===================================================== */
     function applyDistancesFor(myLat, myLng) {
       if (!stops.value.length) return null;
       let nearestId = null;
@@ -2038,10 +2263,8 @@ createApp({
         return { ...s, distance: d };
       });
 
-      // 指派全新陣列，Safari & Chrome 都會重新渲染
       stops.value = updated;
 
-      // 若已有選取車站，重新指向新陣列的物件，避免後續參照到舊物件
       if (selectedStop.value) {
         const cur = updated.find(s => s.id === selectedStop.value.id);
         if (cur) selectedStop.value = cur;
@@ -2054,7 +2277,6 @@ createApp({
     async function autoLocateNearestStop() {
       if (!stops.value.length) return;
 
-      // 若已有快取位置，立即先算一次距離
       if (lastUserPos && isValidCoord(lastUserPos.lat, lastUserPos.lng)) {
         applyDistancesFor(lastUserPos.lat, lastUserPos.lng);
       }
@@ -2065,7 +2287,7 @@ createApp({
         const nearest = applyDistancesFor(me.lat, me.lng);
         if (nearest) await applySelection(nearest);
       } catch (e) {
-        /* 定位失敗：不打擾使用者，讓其手動選擇 */
+        /* 定位失敗：不打擾使用者 */
       }
     }
 
@@ -2078,7 +2300,6 @@ createApp({
 
     async function applySelection(stop) {
       if (!stop || !isValidCoord(stop.lat, stop.lng)) return;
-      // 確保指向當前 stops 陣列中的物件
       const current = stops.value.find(s => s.id === stop.id);
       selectedStop.value = current || stop;
       if (mapExpanded.value) mapExpanded.value = false;
@@ -2432,6 +2653,10 @@ createApp({
       initMaps();
       if (mapDesktop) buildLabelLayer(mapDesktop);
       loadRoutes();
+
+      // 應用啟動時預先下載票價數據（不阻塞UI）
+      fetchFareDb().catch(() => {});
+
       window.addEventListener("resize", handleResize);
       window.addEventListener("orientationchange", handleResize);
       window.addEventListener("beforeunload", saveFavouritesOnExit);
@@ -2460,6 +2685,7 @@ createApp({
       isMobile, showCompanyPicker, mobileSearching, pickerCompanyIds,
       availableCompaniesForPicker, favExpanded, isLanding,
       favourites, isCurrentFavourite,
+      currentFare, fareHoliday, isHoliday,
       onCompanyChange, onSearch, onCompanyPick, closeCompanyPicker,
       selectDirection, onStopClick, onStopMapClick,
       expandMap, collapseMap, zoomIn, zoomOut, clearDirection,
