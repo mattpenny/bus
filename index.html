@@ -237,7 +237,6 @@
   }
   input[type="text"]:focus { outline: 2px solid #1a3d7c; border-color: #1a3d7c; }
 
-  /* 登陸頁 */
   .row.landing {
     margin-bottom: 14px;
     gap: 8px;
@@ -262,7 +261,6 @@
     font-size: calc(15px * var(--font-scale));
     border-radius: 10px;
   }
-  /* === 閃爍速度已調慢：1.2s → 2.4s，透明度由 0.15 → 0.3 === */
   .row.landing input[type="text"]::placeholder {
     color: #1a3d7c;
     font-weight: 700;
@@ -401,6 +399,7 @@
     font-size: calc(11px * var(--font-scale)); color: #27ae60; background: #e8f8ee;
     padding: 2px 6px; border-radius: 10px;
     font-weight: 600; flex-shrink: 0;
+    white-space: nowrap;
   }
   .stop-list li.active .distance { background: #ffd5d5; color: #c0392b; }
 
@@ -980,7 +979,7 @@
                 <line x1="16" y1="6" x2="16" y2="21"/>
               </svg>
             </button>
-            <span v-if="s.distance !== undefined" class="distance">
+            <span v-if="Number.isFinite(s.distance)" class="distance">
               {{ formatDistance(s.distance) }}
             </span>
           </li>
@@ -2012,44 +2011,80 @@ createApp({
             else if (err.code === 3) msg = "定位超時";
             reject(new Error(msg));
           },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 300000
+          }
         );
       });
     }
 
+    /* =====================================================
+       用新陣列物件取代原有 stops，強制 Vue 重新渲染
+       —— 這可修正 Safari 不會因為純屬性新增而更新的問題
+       ===================================================== */
+    function applyDistancesFor(myLat, myLng) {
+      if (!stops.value.length) return null;
+      let nearestId = null;
+      let minDist = Infinity;
+
+      const updated = stops.value.map(s => {
+        if (!isValidCoord(s.lat, s.lng)) {
+          return { ...s, distance: null };
+        }
+        const d = haversineMeters(myLat, myLng, s.lat, s.lng);
+        if (d < minDist) { minDist = d; nearestId = s.id; }
+        return { ...s, distance: d };
+      });
+
+      // 指派全新陣列，Safari & Chrome 都會重新渲染
+      stops.value = updated;
+
+      // 若已有選取車站，重新指向新陣列的物件，避免後續參照到舊物件
+      if (selectedStop.value) {
+        const cur = updated.find(s => s.id === selectedStop.value.id);
+        if (cur) selectedStop.value = cur;
+      }
+
+      if (!nearestId) return null;
+      return updated.find(s => s.id === nearestId) || null;
+    }
+
     async function autoLocateNearestStop() {
       if (!stops.value.length) return;
+
+      // 若已有快取位置，立即先算一次距離
+      if (lastUserPos && isValidCoord(lastUserPos.lat, lastUserPos.lng)) {
+        applyDistancesFor(lastUserPos.lat, lastUserPos.lng);
+      }
+
       try {
         const me = await getUserPosition();
         showUserMarker(me.lat, me.lng);
-
-        let nearest = null;
-        let minDist = Infinity;
-        for (const s of stops.value) {
-          if (!isValidCoord(s.lat, s.lng)) continue;
-          s.distance = haversineMeters(me.lat, me.lng, s.lat, s.lng);
-          if (s.distance < minDist) { minDist = s.distance; nearest = s; }
-        }
-        if (!nearest) return;
-        await applySelection(nearest);
+        const nearest = applyDistancesFor(me.lat, me.lng);
+        if (nearest) await applySelection(nearest);
       } catch (e) {
-        /* 定位失敗：不打擾使用者 */
+        /* 定位失敗：不打擾使用者，讓其手動選擇 */
       }
     }
 
     function formatDistance(meters) {
       if (meters === undefined || meters === null) return "";
+      if (!Number.isFinite(meters)) return "";
       if (meters < 1000) return Math.round(meters) + " m";
       return (meters / 1000).toFixed(1) + " km";
     }
 
     async function applySelection(stop) {
       if (!stop || !isValidCoord(stop.lat, stop.lng)) return;
-      selectedStop.value = stop;
+      // 確保指向當前 stops 陣列中的物件
+      const current = stops.value.find(s => s.id === stop.id);
+      selectedStop.value = current || stop;
       if (mapExpanded.value) mapExpanded.value = false;
       await nextTick();
-      await scrollSelectedIntoView(stop);
-      if (isMapUsable(activeMap)) focusMapOnStop(stop);
+      await scrollSelectedIntoView(selectedStop.value);
+      if (isMapUsable(activeMap)) focusMapOnStop(selectedStop.value);
       await refreshEta();
     }
 
