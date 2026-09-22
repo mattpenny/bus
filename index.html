@@ -491,32 +491,34 @@
     text-overflow: ellipsis; white-space: nowrap;
   }
 
-  /* === 票價顯示 === */
+  /* === 票價顯示：標籤、數值、備註同字級 === */
   .fare-line {
     display: flex; align-items: baseline; gap: 8px;
     padding: 6px 0 8px;
     border-bottom: 1px solid #f0f0f0;
     margin-bottom: 6px;
     flex-wrap: wrap;
+    font-size: calc(20px * var(--font-scale));
+    line-height: 1.2;
   }
   .fare-label {
-    font-size: calc(12px * var(--font-scale));
+    font-size: inherit;
     color: #888;
-    font-weight: 600;
+    font-weight: 700;
   }
   .fare-value {
-    font-size: calc(20px * var(--font-scale));
+    font-size: inherit;
     font-weight: 800;
     color: #e67e22;
     font-variant-numeric: tabular-nums;
-    line-height: 1;
   }
   .fare-note {
-    font-size: calc(11px * var(--font-scale));
+    font-size: inherit;
     color: #888;
+    font-weight: 600;
   }
   .fare-holiday-tag {
-    font-size: calc(10px * var(--font-scale));
+    font-size: calc(11px * var(--font-scale));
     color: #fff;
     background: #e67e22;
     padding: 1px 6px;
@@ -707,6 +709,10 @@
     .eta-box .exact-time { font-size: calc(18px * var(--font-scale)); }
     .eta-box .rank { width: 68px; font-size: calc(18px * var(--font-scale)); }
     .eta-header h3 small { font-size: calc(11px * var(--font-scale)); }
+
+    /* 手機：票價區塊字級與 ETA 時間一致 */
+    .fare-line { font-size: calc(18px * var(--font-scale)); }
+    .fare-holiday-tag { font-size: calc(10px * var(--font-scale)); }
 
     .stop-list { max-height: 60vh; }
 
@@ -1131,9 +1137,6 @@ window.addEventListener("unhandledrejection", (e) => {
   dbgError("Promise", e.reason);
 });
 
-/* =========================================================
-   日期解析
-   ========================================================= */
 function parseDate(input) {
   if (!input) return null;
   if (input instanceof Date) return input;
@@ -1156,9 +1159,6 @@ function parseDate(input) {
   return null;
 }
 
-/* =========================================================
-   API 層
-   ========================================================= */
 const KMB_BASE = "https://data.etabus.gov.hk/v1/transport/kmb";
 const CTB_BASE = "https://rt.data.gov.hk/v2/transport/citybus";
 const NLB_BASE = "https://rt.data.gov.hk/v2/transport/nlb";
@@ -1169,9 +1169,7 @@ async function getJSON(url) {
   return res.json();
 }
 
-function toApiDirection(bound) {
-  return bound === "O" ? "outbound" : "inbound";
-}
+function toApiDirection(bound) { return bound === "O" ? "outbound" : "inbound"; }
 
 function formatExactTime(isoOrDateObj) {
   if (!isoOrDateObj) return "";
@@ -1310,10 +1308,7 @@ function minutesUntil(iso) {
   return Math.max(0, Math.round((d.getTime() - Date.now()) / 60000));
 }
 
-/* =========================================================
-   票價數據層（分段收費）
-   ========================================================= */
-const FARE_CACHE_KEY = "hk-bus-fare-data-v3";   // v3：修正 stops 結構
+const FARE_CACHE_KEY = "hk-bus-fare-data-v3";
 const FARE_CACHE_VERSION = 3;
 const FARE_CACHE_DAYS = 7;
 const FARE_URL_PRIMARY = "https://data.hkbus.app/routeFareList.min.json";
@@ -1339,25 +1334,9 @@ function saveFareCacheToStorage(data) {
     localStorage.setItem(FARE_CACHE_KEY, JSON.stringify({
       version: FARE_CACHE_VERSION, timestamp: Date.now(), data: data,
     }));
-  } catch (e) { /* 容量不足 */ }
+  } catch (e) {}
 }
 
-/* =========================================================
-   解析 hk-bus-crawling routeFareList
-   實際結構：
-   {
-     "1+1+CHUK YUEN ESTATE+STAR FERRY": {
-       bound: { kmb: "O" },
-       co: ["kmb"],
-       fares: ["6.7", ...],
-       faresHoliday: null | [...],
-       stops: { kmb: ["stopId1", "stopId2", ...] },
-       route: "1",
-       serviceType: "1",
-       ...
-     }
-   }
-   ========================================================= */
 function buildFareIndex(raw) {
   const index = {};
   const source = raw && raw.routeList ? raw.routeList : raw;
@@ -1371,19 +1350,15 @@ function buildFareIndex(raw) {
   for (const routeId of Object.keys(source)) {
     const entry = source[routeId];
     if (!entry) continue;
-
     const faresArr = toNums(entry.fares);
     const faresHolArr = toNums(entry.faresHoliday);
     if (faresArr.length === 0 && faresHolArr.length === 0) continue;
 
-    // entry.co 是陣列，如 ["kmb"] 或 ["kmb","lwb"]
     const companyList = Array.isArray(entry.co)
       ? entry.co.map(c => String(c).toLowerCase())
       : [];
     const primaryCompany = companyList[0] || "";
 
-    // entry.stops 是 { kmb: [...stopIds], lwb: [...] } 結構
-    // 每個公司的 stopIds 陣列與 fares 的索引一一對應
     const stopsMap = {};
     if (entry.stops && typeof entry.stops === "object") {
       for (const coKey of Object.keys(entry.stops)) {
@@ -1397,10 +1372,8 @@ function buildFareIndex(raw) {
     index[routeId] = {
       route: String(entry.route || ""),
       serviceType: String(entry.serviceType || "1"),
-      companyList,
-      primaryCompany,
-      fares: faresArr,
-      faresHoliday: faresHolArr,
+      companyList, primaryCompany,
+      fares: faresArr, faresHoliday: faresHolArr,
       stopsMap,
     };
   }
@@ -1426,7 +1399,7 @@ async function fetchFareDb() {
         fareDb = index;
         saveFareCacheToStorage(index);
         return fareDb;
-      } catch (e) { /* 嘗試下一個源 */ }
+      } catch (e) {}
     }
     return null;
   })();
@@ -1435,14 +1408,8 @@ async function fetchFareDb() {
   finally { fareDbLoading = null; }
 }
 
-function isTodayHoliday() {
-  return new Date().getDay() === 0;
-}
+function isTodayHoliday() { return new Date().getDay() === 0; }
 
-/* =========================================================
-   查找指定路線 + 公司的票價條目
-   companyId 傳入 "KMB" / "CTB" / "NLB"（大寫），函式內部統一轉小寫
-   ========================================================= */
 function lookupFareEntry(routeNum, companyId, serviceType) {
   if (!fareDb) return null;
   const num = String(routeNum || "").toUpperCase();
@@ -1451,7 +1418,6 @@ function lookupFareEntry(routeNum, companyId, serviceType) {
   const coLower = String(companyId || "").toLowerCase();
   const st = String(serviceType || "1");
 
-  // KMB 特殊：如 uiCompany === "KMB"，實際可能屬 LWB（龍運），這裡做寬鬆匹配
   const candidates = [];
   for (const key of Object.keys(fareDb)) {
     const entry = fareDb[key];
@@ -1462,25 +1428,16 @@ function lookupFareEntry(routeNum, companyId, serviceType) {
   }
   if (candidates.length === 0) return null;
 
-  // 優先精確匹配公司
   const exact = candidates.find(c => c.entry.companyList.includes(coLower));
   if (exact) return exact.entry;
 
-  // KMB 查不到時嘗試 LWB（因為龍運巴士車費表在 hkbus 中以 lwb 標示）
   if (coLower === "kmb") {
     const lwb = candidates.find(c => c.entry.companyList.includes("lwb"));
     if (lwb) return lwb.entry;
   }
-
-  // 最後退回第一個
   return candidates[0].entry;
 }
 
-/* =========================================================
-   依所選車站計算票價
-   - 首選：用 stop.id 在 entry.stopsMap[companyKey] 中定位索引
-   - 次選：用 stop.seq - 1 定位索引
-   ========================================================= */
 function computeBoardingFare(entry, companyId, stop) {
   if (!entry) return null;
   if (!stop) return null;
@@ -1494,13 +1451,10 @@ function computeBoardingFare(entry, companyId, stop) {
   const fullFare = fares[0];
   const coLower = String(companyId || "").toLowerCase();
 
-  // 挑選 stops 陣列：優先該公司，其次 kmb/lwb，再其次任意
   let stopArr = null;
-  if (entry.stopsMap[coLower]) {
-    stopArr = entry.stopsMap[coLower];
-  } else if (coLower === "kmb" && entry.stopsMap["lwb"]) {
-    stopArr = entry.stopsMap["lwb"];
-  } else {
+  if (entry.stopsMap[coLower]) stopArr = entry.stopsMap[coLower];
+  else if (coLower === "kmb" && entry.stopsMap["lwb"]) stopArr = entry.stopsMap["lwb"];
+  else {
     for (const k of Object.keys(entry.stopsMap)) {
       stopArr = entry.stopsMap[k];
       break;
@@ -1508,20 +1462,16 @@ function computeBoardingFare(entry, companyId, stop) {
   }
 
   let idx = -1;
-
-  // 策略 1：以 stop.id 在陣列中搜尋
   if (stopArr && stop.id) {
     const sid = String(stop.id);
     idx = stopArr.findIndex(x => String(x) === sid);
   }
 
-  // 策略 2：以 stop.seq 作為位置（seq 為 1-based）
   if (idx < 0 && Number.isFinite(stop.seq) && stop.seq >= 1) {
     const candidateIdx = stop.seq - 1;
     if (candidateIdx < fares.length) idx = candidateIdx;
   }
 
-  // 若仍無法定位，退而使用全程票價
   if (idx < 0 || idx >= fares.length) {
     return { boarding: fullFare, full: fullFare, isSectional: false };
   }
@@ -1531,9 +1481,6 @@ function computeBoardingFare(entry, companyId, stop) {
   return { boarding, full: fullFare, isSectional };
 }
 
-/* =========================================================
-   地理計算
-   ========================================================= */
 const HK_CENTER = [22.322, 114.178];
 const HK_ZOOM = 13;
 const TILE_BASEMAP = "https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png";
@@ -1577,9 +1524,6 @@ function isMapUsable(map) {
   } catch (e) { return false; }
 }
 
-/* =========================================================
-   巴士標記
-   ========================================================= */
 function busPinSvg({ pinColor, pulse, scale }) {
   const pinW = 32 * scale, pinH = 40 * scale;
   const busW = 34 * scale, busH = 22 * scale;
@@ -1645,9 +1589,6 @@ function makeStopLabelIcon(name, selected) {
   });
 }
 
-/* =========================================================
-   儲存層
-   ========================================================= */
 const FAV_STORAGE_KEY = "hk-bus-eta-favourites";
 const FONT_SCALE_KEY = "hk-bus-font-scale";
 const FAV_COOKIE_DAYS = 365;
@@ -1743,9 +1684,6 @@ function saveFontScale(scale) {
 
 const AUTO_REFRESH_INTERVAL = 30;
 
-/* =========================================================
-   NLB 圖示
-   ========================================================= */
 const NLB_LOGO = "data:image/svg+xml;utf8," + encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
     <defs>
@@ -1764,9 +1702,6 @@ const NLB_LOGO = "data:image/svg+xml;utf8," + encodeURIComponent(`
   </svg>
 `);
 
-/* =========================================================
-   Vue App
-   ========================================================= */
 createApp({
   setup() {
     const fontScale = ref(loadFontScale());
@@ -1827,12 +1762,10 @@ createApp({
     });
     const isHoliday = computed(() => isTodayHoliday());
 
-    /* === 依所選車站計算票價 === */
     const fareDisplay = computed(() => {
       const entry = currentFareEntry.value;
       if (!entry) return null;
-      const result = computeBoardingFare(entry, company.value, selectedStop.value);
-      return result;
+      return computeBoardingFare(entry, company.value, selectedStop.value);
     });
 
     function saveFavourites() {
@@ -2240,7 +2173,7 @@ createApp({
         showUserMarker(me.lat, me.lng);
         const nearest = applyDistancesFor(me.lat, me.lng);
         if (nearest) await applySelection(nearest);
-      } catch (e) { /* 定位失敗 */ }
+      } catch (e) {}
     }
 
     function formatDistance(meters) {
