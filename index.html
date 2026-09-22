@@ -43,9 +43,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
   @supports (-webkit-touch-callout: none) {
-    html, body {
-      height: -webkit-fill-available;
-    }
+    html, body { height: -webkit-fill-available; }
   }
 
   #app {
@@ -57,9 +55,7 @@
     overflow: hidden;
   }
   @supports (-webkit-touch-callout: none) {
-    #app {
-      height: -webkit-fill-available;
-    }
+    #app { height: -webkit-fill-available; }
   }
 
   button, input, select, textarea {
@@ -670,10 +666,7 @@
     .main-area { display: contents; }
     .map-wrap-desktop { display: none !important; }
 
-    .panel {
-      padding: 10px;
-      min-width: 0; max-width: 100%;
-    }
+    .panel { padding: 10px; min-width: 0; max-width: 100%; }
 
     .sidebar {
       max-width: 100%; min-width: 0;
@@ -695,28 +688,19 @@
       overflow: hidden;
     }
     .fav-slot .fav-remove {
-      top: 1px;
-      right: 1px;
+      top: 1px; right: 1px;
       width: 16px; height: 16px;
       font-size: 10px;
       border-width: 1.5px;
     }
     .fav-slot .fav-route { font-size: calc(14px * var(--font-scale)); }
     .fav-slot .fav-company { font-size: calc(8px * var(--font-scale)); padding: 1px 4px; }
-    .fav-slot .fav-dest {
-      font-size: calc(9px * var(--font-scale));
-      -webkit-line-clamp: 2;
-    }
+    .fav-slot .fav-dest { font-size: calc(9px * var(--font-scale)); -webkit-line-clamp: 2; }
     .fav-slot .fav-plus { font-size: calc(18px * var(--font-scale)); }
     .fav-slot .fav-hint { font-size: calc(9px * var(--font-scale)); }
 
-    .stop-list .stop-map-btn {
-      display: flex;
-      width: 28px; height: 28px;
-    }
-    .stop-list .stop-map-btn svg {
-      width: 15px; height: 15px;
-    }
+    .stop-list .stop-map-btn { display: flex; width: 28px; height: 28px; }
+    .stop-list .stop-map-btn svg { width: 15px; height: 15px; }
 
     .eta-box { max-height: 260px; padding: 8px 12px; }
     .eta-box .time { font-size: calc(18px * var(--font-scale)); }
@@ -755,13 +739,8 @@
       .panel { padding: 8px; }
       .row label { min-width: 50px; font-size: calc(12px * var(--font-scale)); }
       .row .search-btn { padding: 10px 10px; font-size: calc(13px * var(--font-scale)); }
-      .row.landing label {
-        font-size: calc(17px * var(--font-scale));
-        min-width: 76px;
-      }
-      .row.landing input[type="text"] {
-        font-size: max(16px, calc(15px * var(--font-scale)));
-      }
+      .row.landing label { font-size: calc(17px * var(--font-scale)); min-width: 76px; }
+      .row.landing input[type="text"] { font-size: max(16px, calc(15px * var(--font-scale))); }
       .company-sheet .company-btn img { height: 36px; max-width: 74px; }
     }
   }
@@ -809,8 +788,7 @@
     .map-overlay-header .close-btn:hover { background: rgba(255,255,255,0.32); }
     .map-overlay .map-body {
       flex: 1 1 auto; min-height: 0;
-      position: relative;
-      overflow: hidden;
+      position: relative; overflow: hidden;
     }
     .map-overlay #map-mobile { width: 100%; height: 100%; border-radius: 0; }
     .map-overlay .map-zoom-controls { top: 12px; left: 12px; }
@@ -864,12 +842,10 @@
   }
 
   @keyframes overlayFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+    from { opacity: 0; } to { opacity: 1; }
   }
   @-webkit-keyframes overlayFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+    from { opacity: 0; } to { opacity: 1; }
   }
 
   .searching-hint {
@@ -1048,7 +1024,6 @@
           </button>
         </div>
 
-        <!-- === 票價顯示（依所選車站分段收費） === -->
         <div v-if="fareDisplay" class="fare-line">
           <template v-if="fareDisplay.isSectional">
             <span class="fare-label">收費</span>
@@ -1164,29 +1139,20 @@ function parseDate(input) {
   if (input instanceof Date) return input;
   const s = String(input).trim();
   if (!s) return null;
-
   let d = new Date(s);
   if (!isNaN(d.getTime())) return d;
-
   d = new Date(s.replace(" ", "T"));
   if (!isNaN(d.getTime())) return d;
-
   d = new Date(s.replace(" ", "T") + "+08:00");
   if (!isNaN(d.getTime())) return d;
-
   const m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
   if (m) {
     d = new Date(
-      parseInt(m[1], 10),
-      parseInt(m[2], 10) - 1,
-      parseInt(m[3], 10),
-      parseInt(m[4], 10),
-      parseInt(m[5], 10),
-      m[6] ? parseInt(m[6], 10) : 0
+      parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10),
+      parseInt(m[4], 10), parseInt(m[5], 10), m[6] ? parseInt(m[6], 10) : 0
     );
     if (!isNaN(d.getTime())) return d;
   }
-
   return null;
 }
 
@@ -1224,18 +1190,15 @@ function isLwbRoute(routeNum) {
 async function fetchKmbRoutes() {
   const j = await getJSON(`${KMB_BASE}/route/`);
   return j.data.map(r => ({
-    route: r.route,
-    orig_tc: r.orig_tc,
-    dest_tc: r.dest_tc,
-    direction: r.bound,
-    serviceType: r.service_type || "1",
+    route: r.route, orig_tc: r.orig_tc, dest_tc: r.dest_tc,
+    direction: r.bound, serviceType: r.service_type || "1",
     isLwb: isLwbRoute(r.route),
   }));
 }
 async function fetchKmbRouteStops(route, direction, serviceType = "1") {
   const dir = toApiDirection(direction);
   const j = await getJSON(`${KMB_BASE}/route-stop/${route}/${dir}/${serviceType}`);
-  return j.data.map(s => ({ seq: s.seq, stopId: s.stop }));
+  return j.data.map(s => ({ seq: Number(s.seq), stopId: s.stop }));
 }
 async function fetchKmbStop(stopId) {
   const j = await getJSON(`${KMB_BASE}/stop/${stopId}`);
@@ -1249,12 +1212,8 @@ async function fetchKmbEta(stopId, route, serviceType = "1") {
   const j = await getJSON(`${KMB_BASE}/eta/${stopId}/${route}/${serviceType}`);
   const now = Date.now();
   const items = j.data.filter(e => e.eta).slice(0, 3).map(e => ({
-    eta: e.eta,
-    minutes: minutesUntil(e.eta),
-    exactTime: formatExactTime(e.eta),
-    remark: e.rmk_tc || "",
-    company: e.co,
-    dataTimestamp: e.data_timestamp,
+    eta: e.eta, minutes: minutesUntil(e.eta), exactTime: formatExactTime(e.eta),
+    remark: e.rmk_tc || "", company: e.co, dataTimestamp: e.data_timestamp,
   }));
   const ageSeconds = items.length && items[0].dataTimestamp
     ? Math.max(0, Math.round((now - parseDate(items[0].dataTimestamp).getTime()) / 1000))
@@ -1266,21 +1225,17 @@ async function fetchCitybusRoutes() {
   const j = await getJSON(`${CTB_BASE}/route/CTB`);
   const list = [];
   for (const r of j.data) {
-    list.push({
-      route: r.route, orig_tc: r.orig_tc, dest_tc: r.dest_tc,
-      direction: "O", serviceType: "1", isLwb: false,
-    });
-    list.push({
-      route: r.route, orig_tc: r.dest_tc, dest_tc: r.orig_tc,
-      direction: "I", serviceType: "1", isLwb: false,
-    });
+    list.push({ route: r.route, orig_tc: r.orig_tc, dest_tc: r.dest_tc,
+      direction: "O", serviceType: "1", isLwb: false });
+    list.push({ route: r.route, orig_tc: r.dest_tc, dest_tc: r.orig_tc,
+      direction: "I", serviceType: "1", isLwb: false });
   }
   return list;
 }
 async function fetchCitybusRouteStops(route, direction) {
   const dir = toApiDirection(direction);
   const j = await getJSON(`${CTB_BASE}/route-stop/CTB/${route}/${dir}`);
-  return j.data.map(s => ({ seq: s.seq, stopId: s.stop }));
+  return j.data.map((s, i) => ({ seq: i + 1, stopId: s.stop }));
 }
 async function fetchCitybusStop(stopId) {
   const j = await getJSON(`${CTB_BASE}/stop/${stopId}`);
@@ -1294,12 +1249,8 @@ async function fetchCitybusEta(stopId, route) {
   const j = await getJSON(`${CTB_BASE}/eta/CTB/${stopId}/${route}`);
   const now = Date.now();
   const items = j.data.filter(e => e.eta).slice(0, 3).map(e => ({
-    eta: e.eta,
-    minutes: minutesUntil(e.eta),
-    exactTime: formatExactTime(e.eta),
-    remark: e.rmk_tc || "",
-    company: "CTB",
-    dataTimestamp: e.data_timestamp,
+    eta: e.eta, minutes: minutesUntil(e.eta), exactTime: formatExactTime(e.eta),
+    remark: e.rmk_tc || "", company: "CTB", dataTimestamp: e.data_timestamp,
   }));
   const ageSeconds = items.length && items[0].dataTimestamp
     ? Math.max(0, Math.round((now - parseDate(items[0].dataTimestamp).getTime()) / 1000))
@@ -1314,20 +1265,16 @@ async function fetchNlbRoutes() {
     const orig = (parts[0] || "").trim();
     const dest = (parts[1] || "").trim();
     return {
-      route: r.routeNo,
-      routeId: String(r.routeId),
-      orig_tc: orig || r.routeName_c,
-      dest_tc: dest || "",
-      direction: "O",
-      serviceType: "1",
-      isLwb: false,
-      isNlb: true,
+      route: r.routeNo, routeId: String(r.routeId),
+      orig_tc: orig || r.routeName_c, dest_tc: dest || "",
+      direction: "O", serviceType: "1", isLwb: false, isNlb: true,
     };
   });
 }
 async function fetchNlbRouteStops(routeId) {
   const j = await getJSON(`${NLB_BASE}/stop.php?action=list&routeId=${encodeURIComponent(routeId)}`);
-  return (j.stops || []).map(s => ({
+  return (j.stops || []).map((s, i) => ({
+    seq: i + 1,
     id: String(s.stopId),
     name: s.stopName_c,
     lat: Number(s.latitude),
@@ -1341,12 +1288,10 @@ async function fetchNlbEta(routeId, stopId) {
   const items = arr.slice(0, 3).map(e => {
     const parsedDate = parseDate(e.estimatedArrivalTime);
     return {
-      eta: e.estimatedArrivalTime,
-      minutes: nlbMinutesUntil(e.estimatedArrivalTime),
+      eta: e.estimatedArrivalTime, minutes: nlbMinutesUntil(e.estimatedArrivalTime),
       exactTime: formatExactTime(parsedDate),
       remark: e.noGPS ? "無GPS" : (e.departed ? "已開出" : ""),
-      company: "NLB",
-      dataTimestamp: e.generateTime,
+      company: "NLB", dataTimestamp: e.generateTime,
     };
   });
   const ageSeconds = arr.length && arr[0].generateTime
@@ -1359,7 +1304,6 @@ function nlbMinutesUntil(s) {
   if (!d || isNaN(d.getTime())) return null;
   return Math.max(0, Math.round((d.getTime() - Date.now()) / 60000));
 }
-
 function minutesUntil(iso) {
   const d = parseDate(iso);
   if (!d || isNaN(d.getTime())) return null;
@@ -1369,8 +1313,8 @@ function minutesUntil(iso) {
 /* =========================================================
    票價數據層（分段收費）
    ========================================================= */
-const FARE_CACHE_KEY = "hk-bus-fare-data-v2";    // v2：加入 stops 映射
-const FARE_CACHE_VERSION = 2;
+const FARE_CACHE_KEY = "hk-bus-fare-data-v3";   // v3：修正 stops 結構
+const FARE_CACHE_VERSION = 3;
 const FARE_CACHE_DAYS = 7;
 const FARE_URL_PRIMARY = "https://data.hkbus.app/routeFareList.min.json";
 const FARE_URL_FALLBACK = "https://hkbus.github.io/hk-bus-crawling/routeFareList.min.json";
@@ -1387,22 +1331,33 @@ function loadFareCacheFromStorage() {
     const ageMs = Date.now() - (parsed.timestamp || 0);
     if (ageMs > FARE_CACHE_DAYS * 864e5) return null;
     return parsed.data || null;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 function saveFareCacheToStorage(data) {
   try {
     localStorage.setItem(FARE_CACHE_KEY, JSON.stringify({
-      version: FARE_CACHE_VERSION,
-      timestamp: Date.now(),
-      data: data,
+      version: FARE_CACHE_VERSION, timestamp: Date.now(), data: data,
     }));
-  } catch (e) { /* 容量不足時靜默失敗 */ }
+  } catch (e) { /* 容量不足 */ }
 }
 
-/* 將原始 JSON 轉為精簡映射，包含 stops → fareIndex */
+/* =========================================================
+   解析 hk-bus-crawling routeFareList
+   實際結構：
+   {
+     "1+1+CHUK YUEN ESTATE+STAR FERRY": {
+       bound: { kmb: "O" },
+       co: ["kmb"],
+       fares: ["6.7", ...],
+       faresHoliday: null | [...],
+       stops: { kmb: ["stopId1", "stopId2", ...] },
+       route: "1",
+       serviceType: "1",
+       ...
+     }
+   }
+   ========================================================= */
 function buildFareIndex(raw) {
   const index = {};
   const source = raw && raw.routeList ? raw.routeList : raw;
@@ -1416,26 +1371,37 @@ function buildFareIndex(raw) {
   for (const routeId of Object.keys(source)) {
     const entry = source[routeId];
     if (!entry) continue;
-    const faresRaw = entry.fares;
-    const faresHolidayRaw = entry.faresHoliday;
-    if (!Array.isArray(faresRaw) && !Array.isArray(faresHolidayRaw)) continue;
 
-    // 只保留進行查找所需的最少字段
+    const faresArr = toNums(entry.fares);
+    const faresHolArr = toNums(entry.faresHoliday);
+    if (faresArr.length === 0 && faresHolArr.length === 0) continue;
+
+    // entry.co 是陣列，如 ["kmb"] 或 ["kmb","lwb"]
+    const companyList = Array.isArray(entry.co)
+      ? entry.co.map(c => String(c).toLowerCase())
+      : [];
+    const primaryCompany = companyList[0] || "";
+
+    // entry.stops 是 { kmb: [...stopIds], lwb: [...] } 結構
+    // 每個公司的 stopIds 陣列與 fares 的索引一一對應
     const stopsMap = {};
-    const srcStops = entry.stops;
-    if (srcStops && typeof srcStops === "object") {
-      for (const sid of Object.keys(srcStops)) {
-        const idx = srcStops[sid];
-        if (typeof idx === "number") stopsMap[String(sid)] = idx;
+    if (entry.stops && typeof entry.stops === "object") {
+      for (const coKey of Object.keys(entry.stops)) {
+        const arr = entry.stops[coKey];
+        if (Array.isArray(arr)) {
+          stopsMap[coKey] = arr.map(s => String(s));
+        }
       }
     }
 
     index[routeId] = {
-      fares: toNums(faresRaw),
-      faresHoliday: toNums(faresHolidayRaw),
-      stops: stopsMap,
-      route: entry.route || "",
-      co: entry.co || "",
+      route: String(entry.route || ""),
+      serviceType: String(entry.serviceType || "1"),
+      companyList,
+      primaryCompany,
+      fares: faresArr,
+      faresHoliday: faresHolArr,
+      stopsMap,
     };
   }
   return index;
@@ -1447,10 +1413,7 @@ async function fetchFareDb() {
 
   fareDbLoading = (async () => {
     const cached = loadFareCacheFromStorage();
-    if (cached) {
-      fareDb = cached;
-      return fareDb;
-    }
+    if (cached) { fareDb = cached; return fareDb; }
 
     const urls = [FARE_URL_PRIMARY, FARE_URL_FALLBACK];
     for (const url of urls) {
@@ -1468,40 +1431,104 @@ async function fetchFareDb() {
     return null;
   })();
 
-  try {
-    return await fareDbLoading;
-  } finally {
-    fareDbLoading = null;
-  }
+  try { return await fareDbLoading; }
+  finally { fareDbLoading = null; }
 }
 
 function isTodayHoliday() {
-  const d = new Date();
-  return d.getDay() === 0;
+  return new Date().getDay() === 0;
 }
 
-/* 查找路線票價條目：優先匹配路線號，次選匹配公司 */
-function lookupFareEntry(routeNum, companyId) {
+/* =========================================================
+   查找指定路線 + 公司的票價條目
+   companyId 傳入 "KMB" / "CTB" / "NLB"（大寫），函式內部統一轉小寫
+   ========================================================= */
+function lookupFareEntry(routeNum, companyId, serviceType) {
   if (!fareDb) return null;
   const num = String(routeNum || "").toUpperCase();
   if (!num) return null;
 
-  const co = String(companyId || "").toLowerCase();
-  const candidates = [];
+  const coLower = String(companyId || "").toLowerCase();
+  const st = String(serviceType || "1");
 
+  // KMB 特殊：如 uiCompany === "KMB"，實際可能屬 LWB（龍運），這裡做寬鬆匹配
+  const candidates = [];
   for (const key of Object.keys(fareDb)) {
     const entry = fareDb[key];
     if (!entry) continue;
-    const keyRoute = key.split("+")[0].toUpperCase();
-    const entryRoute = String(entry.route || "").toUpperCase();
-    if (keyRoute === num || entryRoute === num) {
-      candidates.push(entry);
-    }
+    if (String(entry.route).toUpperCase() !== num) continue;
+    if (String(entry.serviceType) !== st) continue;
+    candidates.push({ key, entry });
   }
   if (candidates.length === 0) return null;
 
-  const exact = candidates.find(c => String(c.co || "").toLowerCase() === co);
-  return exact || candidates[0];
+  // 優先精確匹配公司
+  const exact = candidates.find(c => c.entry.companyList.includes(coLower));
+  if (exact) return exact.entry;
+
+  // KMB 查不到時嘗試 LWB（因為龍運巴士車費表在 hkbus 中以 lwb 標示）
+  if (coLower === "kmb") {
+    const lwb = candidates.find(c => c.entry.companyList.includes("lwb"));
+    if (lwb) return lwb.entry;
+  }
+
+  // 最後退回第一個
+  return candidates[0].entry;
+}
+
+/* =========================================================
+   依所選車站計算票價
+   - 首選：用 stop.id 在 entry.stopsMap[companyKey] 中定位索引
+   - 次選：用 stop.seq - 1 定位索引
+   ========================================================= */
+function computeBoardingFare(entry, companyId, stop) {
+  if (!entry) return null;
+  if (!stop) return null;
+
+  const holiday = isTodayHoliday();
+  const fares = (holiday && entry.faresHoliday.length > 0)
+    ? entry.faresHoliday
+    : entry.fares;
+  if (!fares || fares.length === 0) return null;
+
+  const fullFare = fares[0];
+  const coLower = String(companyId || "").toLowerCase();
+
+  // 挑選 stops 陣列：優先該公司，其次 kmb/lwb，再其次任意
+  let stopArr = null;
+  if (entry.stopsMap[coLower]) {
+    stopArr = entry.stopsMap[coLower];
+  } else if (coLower === "kmb" && entry.stopsMap["lwb"]) {
+    stopArr = entry.stopsMap["lwb"];
+  } else {
+    for (const k of Object.keys(entry.stopsMap)) {
+      stopArr = entry.stopsMap[k];
+      break;
+    }
+  }
+
+  let idx = -1;
+
+  // 策略 1：以 stop.id 在陣列中搜尋
+  if (stopArr && stop.id) {
+    const sid = String(stop.id);
+    idx = stopArr.findIndex(x => String(x) === sid);
+  }
+
+  // 策略 2：以 stop.seq 作為位置（seq 為 1-based）
+  if (idx < 0 && Number.isFinite(stop.seq) && stop.seq >= 1) {
+    const candidateIdx = stop.seq - 1;
+    if (candidateIdx < fares.length) idx = candidateIdx;
+  }
+
+  // 若仍無法定位，退而使用全程票價
+  if (idx < 0 || idx >= fares.length) {
+    return { boarding: fullFare, full: fullFare, isSectional: false };
+  }
+
+  const boarding = fares[idx];
+  const isSectional = Math.abs(boarding - fullFare) > 0.05;
+  return { boarding, full: fullFare, isSectional };
 }
 
 /* =========================================================
@@ -1547,9 +1574,7 @@ function isMapUsable(map) {
   try {
     const c = map.getContainer();
     return !!c && c.clientWidth > 0 && c.clientHeight > 0;
-  } catch (e) {
-    return false;
-  }
+  } catch (e) { return false; }
 }
 
 /* =========================================================
@@ -1594,13 +1619,11 @@ const BUS_PIN_DEFAULT = L.divIcon({
   html: busPinSvg({ pinColor: "#1a3d7c", pulse: false, scale: 0.5 }),
   iconSize: [22, 26], iconAnchor: [11, 26], popupAnchor: [0, -26],
 });
-
 const BUS_PIN_SELECTED = L.divIcon({
   className: "bus-pin-selected",
   html: busPinSvg({ pinColor: "#e53935", pulse: true, scale: 1 }),
   iconSize: [44, 52], iconAnchor: [22, 52], popupAnchor: [0, -52],
 });
-
 const USER_ICON = L.divIcon({
   className: "user-marker",
   html: `<div style="
@@ -1610,8 +1633,7 @@ const USER_ICON = L.divIcon({
     border-radius:50%;
     box-shadow:0 0 0 4px rgba(33,150,243,0.25), 0 2px 6px rgba(0,0,0,0.35);
   "></div>`,
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
+  iconSize: [22, 22], iconAnchor: [11, 11],
 });
 
 function makeStopLabelIcon(name, selected) {
@@ -1619,8 +1641,7 @@ function makeStopLabelIcon(name, selected) {
   return L.divIcon({
     className: "stop-name-label-wrap",
     html: `<div class="stop-name-label${selected ? " selected" : ""}">${safeName}</div>`,
-    iconSize: [0, 0],
-    iconAnchor: [0, 0],
+    iconSize: [0, 0], iconAnchor: [0, 0],
   });
 }
 
@@ -1649,22 +1670,17 @@ function writeCookie(name, value, days) {
     const expires = new Date(Date.now() + days * 864e5).toUTCString();
     document.cookie =
       name + "=" + encodeURIComponent(value) +
-      "; expires=" + expires +
-      "; path=/; SameSite=Lax";
+      "; expires=" + expires + "; path=/; SameSite=Lax";
     return true;
   } catch (e) { return false; }
 }
 
-function emptyFavArray() {
-  return new Array(MAX_FAVOURITES).fill(null);
-}
+function emptyFavArray() { return new Array(MAX_FAVOURITES).fill(null); }
 
 function compactFavourites(arr) {
   const nonNull = (arr || []).filter(Boolean);
   const result = emptyFavArray();
-  for (let i = 0; i < MAX_FAVOURITES && i < nonNull.length; i++) {
-    result[i] = nonNull[i];
-  }
+  for (let i = 0; i < MAX_FAVOURITES && i < nonNull.length; i++) result[i] = nonNull[i];
   return result;
 }
 
@@ -1676,9 +1692,7 @@ function parseFavArray(raw) {
     const result = emptyFavArray();
     for (let i = 0; i < MAX_FAVOURITES && i < arr.length; i++) {
       const item = arr[i];
-      if (item && typeof item === "object" && item.route && item.company) {
-        result[i] = item;
-      }
+      if (item && typeof item === "object" && item.route && item.company) result[i] = item;
     }
     return compactFavourites(result);
   } catch (e) { return null; }
@@ -1686,20 +1700,15 @@ function parseFavArray(raw) {
 
 function loadFavouritesFromStorage() {
   let fromLS = null;
-  try {
-    fromLS = parseFavArray(localStorage.getItem(FAV_STORAGE_KEY));
-  } catch (e) { console.warn("localStorage 讀取失敗", e); }
+  try { fromLS = parseFavArray(localStorage.getItem(FAV_STORAGE_KEY)); } catch (e) {}
   const fromCookie = parseFavArray(readCookie(FAV_STORAGE_KEY));
 
   const countLS = fromLS ? fromLS.filter(Boolean).length : 0;
   const countCookie = fromCookie ? fromCookie.filter(Boolean).length : 0;
 
   let best = null;
-  if (fromLS && fromCookie) {
-    best = countLS >= countCookie ? fromLS : fromCookie;
-  } else {
-    best = fromLS || fromCookie || null;
-  }
+  if (fromLS && fromCookie) best = countLS >= countCookie ? fromLS : fromCookie;
+  else best = fromLS || fromCookie || null;
   if (!best) return emptyFavArray();
 
   best = compactFavourites(best);
@@ -1765,14 +1774,12 @@ createApp({
     function applyFontScale(scale) {
       document.documentElement.style.setProperty('--font-scale', String(scale));
     }
-
     function updateFontScale(newScale) {
       const clamped = Math.min(Math.max(newScale, MIN_FONT_SCALE), MAX_FONT_SCALE);
       fontScale.value = clamped;
       applyFontScale(clamped);
       saveFontScale(clamped);
     }
-
     function increaseFontSize() { updateFontScale(fontScale.value + 0.1); }
     function decreaseFontSize() { updateFontScale(fontScale.value - 0.1); }
 
@@ -1811,46 +1818,21 @@ createApp({
     const pickerCompanyIds = ref([]);
 
     const favExpanded = ref(true);
-
     const favourites = ref(loadFavouritesFromStorage());
 
-    /* === 票價狀態 === */
-    const currentFareEntry = ref(null);   // { fares, faresHoliday, stops, route, co }
+    const currentFareEntry = ref(null);
 
     const isLanding = computed(() => {
-      return !searched.value
-          && !routeInput.value.trim()
-          && !stops.value.length;
+      return !searched.value && !routeInput.value.trim() && !stops.value.length;
     });
-
     const isHoliday = computed(() => isTodayHoliday());
 
     /* === 依所選車站計算票價 === */
     const fareDisplay = computed(() => {
       const entry = currentFareEntry.value;
       if (!entry) return null;
-
-      const fares = (isHoliday.value && entry.faresHoliday && entry.faresHoliday.length)
-        ? entry.faresHoliday
-        : entry.fares;
-      if (!fares || !fares.length) return null;
-
-      const fullFare = fares[0];
-      const stop = selectedStop.value;
-
-      if (!stop) {
-        return { boarding: fullFare, full: fullFare, isSectional: false };
-      }
-
-      const stopsMap = entry.stops || {};
-      const idx = stopsMap[stop.id];
-      let boarding = fullFare;
-      if (typeof idx === "number" && idx >= 0 && idx < fares.length) {
-        boarding = fares[idx];
-      }
-
-      const isSectional = Math.abs(boarding - fullFare) > 0.05;
-      return { boarding, full: fullFare, isSectional };
+      const result = computeBoardingFare(entry, company.value, selectedStop.value);
+      return result;
     });
 
     function saveFavourites() {
@@ -1871,7 +1853,7 @@ createApp({
       if (routeListPromises[companyId]) return routeListPromises[companyId];
 
       let promise;
-      if (companyId === "KMB")      promise = fetchKmbRoutes();
+      if (companyId === "KMB") promise = fetchKmbRoutes();
       else if (companyId === "CTB") promise = fetchCitybusRoutes();
       else if (companyId === "NLB") promise = fetchNlbRoutes();
       else return [];
@@ -1906,8 +1888,7 @@ createApp({
       const map = new Map();
       for (const r of allRoutes.value) {
         if (r.route.toUpperCase() !== q) continue;
-        const key = r.isNlb
-          ? "NLB+" + r.routeId
+        const key = r.isNlb ? "NLB+" + r.routeId
           : r.route + "+" + r.direction + "+" + r.serviceType;
         if (!map.has(key)) map.set(key, { ...r, key });
       }
@@ -1941,19 +1922,10 @@ createApp({
       currentFareEntry.value = null;
       const r = findCurrentRoute();
       if (!r) return;
-
       const db = await fetchFareDb();
       if (!db) return;
-
-      const entry = lookupFareEntry(r.route, company.value);
+      const entry = lookupFareEntry(r.route, company.value, r.serviceType || "1");
       if (!entry) return;
-
-      // 確認票價陣列存在且非空
-      if ((!entry.fares || !entry.fares.length) &&
-          (!entry.faresHoliday || !entry.faresHoliday.length)) {
-        return;
-      }
-
       currentFareEntry.value = entry;
     }
 
@@ -2014,45 +1986,31 @@ createApp({
 
       if (autoDirectionKey) {
         const match = matchedRoutes.value.find(r => r.key === autoDirectionKey);
-        if (match) {
-          await selectDirection(match);
-          return;
-        }
+        if (match) { await selectDirection(match); return; }
       }
-
-      if (count === 1) {
-        await selectDirection(matchedRoutes.value[0]);
-      }
+      if (count === 1) await selectDirection(matchedRoutes.value[0]);
     }
 
     async function onSearch() {
       const q = (routeInput.value || "").trim();
       if (!q) return;
-
       collapseFavourites();
-
-      if (!isMobile.value) {
-        searchRoute(q);
-        return;
-      }
+      if (!isMobile.value) { searchRoute(q); return; }
 
       const qUpper = q.toUpperCase();
       mobileSearching.value = true;
       error.value = "";
-
       try {
         const [kmbList, ctbList, nlbList] = await Promise.all([
           loadRouteListFor("KMB"),
           loadRouteListFor("CTB"),
           loadRouteListFor("NLB"),
         ]);
-
         const listByCompany = [
           { id: "KMB", list: kmbList },
           { id: "CTB", list: ctbList },
           { id: "NLB", list: nlbList },
         ];
-
         const matches = listByCompany
           .filter(c => c.list.some(r => r.route.toUpperCase() === qUpper))
           .map(c => c.id);
@@ -2070,7 +2028,6 @@ createApp({
           currentFareEntry.value = null;
           return;
         }
-
         if (matches.length === 1) {
           const targetCompany = matches[0];
           if (company.value !== targetCompany) {
@@ -2080,7 +2037,6 @@ createApp({
           await searchRoute(q);
           return;
         }
-
         pickerCompanyIds.value = matches;
         showCompanyPicker.value = true;
       } catch (e) {
@@ -2094,16 +2050,10 @@ createApp({
       showCompanyPicker.value = false;
       const q = (routeInput.value || "").trim();
       if (!q) return;
-
       collapseFavourites();
-
       const changed = company.value !== id;
-      if (changed) {
-        company.value = id;
-      }
-      if (changed || !allRoutes.value.length) {
-        await loadRoutes();
-      }
+      if (changed) company.value = id;
+      if (changed || !allRoutes.value.length) await loadRoutes();
       await searchRoute(q);
     }
 
@@ -2137,7 +2087,6 @@ createApp({
       countdown.value = null;
       currentFareEntry.value = null;
 
-      // 平行載入票價（不阻塞站點顯示）
       const farePromise = loadFareForCurrentRoute().catch(() => {});
 
       try {
@@ -2146,11 +2095,23 @@ createApp({
           detailed = await fetchNlbRouteStops(r.routeId);
         } else if (company.value === "KMB") {
           const seq = await fetchKmbRouteStops(r.route, r.direction, r.serviceType || "1");
-          const results = await Promise.all(seq.map(s => fetchKmbStop(s.stopId)));
+          const results = await Promise.all(
+            seq.map(async (s) => {
+              const stop = await fetchKmbStop(s.stopId);
+              if (!stop) return null;
+              return { ...stop, seq: s.seq };
+            })
+          );
           detailed = results.filter(s => s !== null);
         } else {
           const seq = await fetchCitybusRouteStops(r.route, r.direction);
-          const results = await Promise.all(seq.map(s => fetchCitybusStop(s.stopId)));
+          const results = await Promise.all(
+            seq.map(async (s) => {
+              const stop = await fetchCitybusStop(s.stopId);
+              if (!stop) return null;
+              return { ...stop, seq: s.seq };
+            })
+          );
           detailed = results.filter(s => s !== null);
         }
         const validStops = detailed.filter(s => isValidCoord(s.lat, s.lng));
@@ -2159,19 +2120,16 @@ createApp({
         const targetMap = isMobile.value
           ? (mapExpanded.value ? mapMobile : null)
           : mapDesktop;
-
         if (isMapUsable(targetMap)) {
           activeMap = targetMap;
           drawOnActiveMap();
         }
-
         await autoLocateNearestStop();
       } catch (e) {
         error.value = "無法載入巴士站：" + e.message;
       } finally {
         loadingStops.value = false;
       }
-
       await farePromise;
     }
 
@@ -2179,9 +2137,7 @@ createApp({
       if (!routeKey.value || !selectedDirectionLabel.value) return;
       const r = findCurrentRoute();
       if (!r) return;
-
       const realCompany = realOperatorOf(r, company.value);
-
       const existingIdx = favourites.value.findIndex(f =>
         f && f.company === realCompany && f.directionKey === routeKey.value
       );
@@ -2192,20 +2148,13 @@ createApp({
         saveFavourites();
         return;
       }
-
       const emptyIdx = favourites.value.findIndex(f => !f);
       if (emptyIdx === -1) return;
-
       favourites.value[emptyIdx] = {
-        company: realCompany,
-        route: r.route,
-        direction: r.direction,
-        serviceType: r.serviceType || "1",
-        directionKey: r.key,
-        routeId: r.routeId || null,
-        label: selectedDirectionLabel.value,
-        orig_tc: r.orig_tc,
-        dest_tc: r.dest_tc,
+        company: realCompany, route: r.route, direction: r.direction,
+        serviceType: r.serviceType || "1", directionKey: r.key,
+        routeId: r.routeId || null, label: selectedDirectionLabel.value,
+        orig_tc: r.orig_tc, dest_tc: r.dest_tc,
       };
       favourites.value = [...favourites.value];
       saveFavourites();
@@ -2224,16 +2173,12 @@ createApp({
     async function onFavClick(index) {
       const fav = favourites.value[index];
       if (!fav) return;
-
       collapseFavourites();
-
       const targetCompany = fav.company === "LWB" ? "KMB" : fav.company;
-
       if (company.value !== targetCompany) {
         company.value = targetCompany;
         await loadRoutes();
       }
-
       routeInput.value = fav.route;
       await searchRoute(fav.route, fav.directionKey);
     }
@@ -2261,11 +2206,7 @@ createApp({
             else if (err.code === 3) msg = "定位超時";
             reject(new Error(msg));
           },
-          {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 300000
-          }
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
         );
       });
     }
@@ -2274,42 +2215,32 @@ createApp({
       if (!stops.value.length) return null;
       let nearestId = null;
       let minDist = Infinity;
-
       const updated = stops.value.map(s => {
-        if (!isValidCoord(s.lat, s.lng)) {
-          return { ...s, distance: null };
-        }
+        if (!isValidCoord(s.lat, s.lng)) return { ...s, distance: null };
         const d = haversineMeters(myLat, myLng, s.lat, s.lng);
         if (d < minDist) { minDist = d; nearestId = s.id; }
         return { ...s, distance: d };
       });
-
       stops.value = updated;
-
       if (selectedStop.value) {
         const cur = updated.find(s => s.id === selectedStop.value.id);
         if (cur) selectedStop.value = cur;
       }
-
       if (!nearestId) return null;
       return updated.find(s => s.id === nearestId) || null;
     }
 
     async function autoLocateNearestStop() {
       if (!stops.value.length) return;
-
       if (lastUserPos && isValidCoord(lastUserPos.lat, lastUserPos.lng)) {
         applyDistancesFor(lastUserPos.lat, lastUserPos.lng);
       }
-
       try {
         const me = await getUserPosition();
         showUserMarker(me.lat, me.lng);
         const nearest = applyDistancesFor(me.lat, me.lng);
         if (nearest) await applySelection(nearest);
-      } catch (e) {
-        /* 定位失敗：不打擾使用者 */
-      }
+      } catch (e) { /* 定位失敗 */ }
     }
 
     function formatDistance(meters) {
@@ -2345,9 +2276,7 @@ createApp({
       }
     }
 
-    async function onStopClick(stop) {
-      await applySelection(stop);
-    }
+    async function onStopClick(stop) { await applySelection(stop); }
 
     async function onStopMapClick(stop) {
       collapseFavourites();
@@ -2361,20 +2290,14 @@ createApp({
       if (!stop) return;
       const r = findCurrentRoute();
       if (!r) return;
-
       if (refreshing.value) return;
       refreshing.value = true;
       countdown.value = AUTO_REFRESH_INTERVAL;
-
       try {
         let result;
-        if (company.value === "NLB") {
-          result = await fetchNlbEta(r.routeId, stop.id);
-        } else if (company.value === "KMB") {
-          result = await fetchKmbEta(stop.id, r.route, r.serviceType || "1");
-        } else {
-          result = await fetchCitybusEta(stop.id, r.route);
-        }
+        if (company.value === "NLB") result = await fetchNlbEta(r.routeId, stop.id);
+        else if (company.value === "KMB") result = await fetchKmbEta(stop.id, r.route, r.serviceType || "1");
+        else result = await fetchCitybusEta(stop.id, r.route);
         etas.value = result.items;
         dataAge.value = result.ageSeconds;
       } catch (e) {
@@ -2452,9 +2375,7 @@ createApp({
 
           const label = L.marker(s._ll, {
             icon: makeStopLabelIcon(s.name, false),
-            interactive: false,
-            keyboard: false,
-            pane: "stopLabelPane",
+            interactive: false, keyboard: false, pane: "stopLabelPane",
           }).addTo(activeMap);
           activeLabels.push(label);
         });
@@ -2486,9 +2407,7 @@ createApp({
           const userLL = safeLatLng(lastUserPos.lat, lastUserPos.lng);
           if (userLL) showUserMarker(lastUserPos.lat, lastUserPos.lng);
         }
-      } catch (e) {
-        dbgError("drawOnActiveMap", e);
-      }
+      } catch (e) { dbgError("drawOnActiveMap", e); }
     }
 
     function focusMapOnStop(stop) {
@@ -2511,13 +2430,11 @@ createApp({
         });
         const targetZoom = Math.max(activeMap.getZoom(), 15);
         activeMap.flyTo(ll, targetZoom, { duration: 0.6 });
-      } catch (e) {
-        dbgError("focusMapOnStop", e);
-      }
+      } catch (e) { dbgError("focusMapOnStop", e); }
     }
 
     function showUserMarker(lat, lng) {
-      lastUserPos = { lat: lat, lng: lng };
+      lastUserPos = { lat, lng };
       if (!isMapUsable(activeMap)) return;
       const ll = safeLatLng(lat, lng);
       if (!ll) return;
@@ -2525,9 +2442,7 @@ createApp({
         if (activeUserMarker) activeMap.removeLayer(activeUserMarker);
         activeUserMarker = L.marker(ll, { icon: USER_ICON }).addTo(activeMap);
         activeUserMarker.bindTooltip("你的位置", { direction: "top" });
-      } catch (e) {
-        dbgError("showUserMarker", e);
-      }
+      } catch (e) { dbgError("showUserMarker", e); }
     }
 
     async function expandMap() {
@@ -2555,13 +2470,9 @@ createApp({
         } else {
           buildLabelLayer(mapMobile);
         }
-      } catch (e) {
-        dbgError("expandMap init", e);
-        return;
-      }
+      } catch (e) { dbgError("expandMap init", e); return; }
 
       activeMap = mapMobile;
-
       await new Promise((r) => setTimeout(r, 120));
       try { mapMobile.invalidateSize(); } catch (e) {}
       drawOnActiveMap();
@@ -2582,23 +2493,15 @@ createApp({
         : null;
 
       try {
-        if (selLL && userLL) {
-          mapMobile.fitBounds([userLL, selLL], { padding: [70, 70] });
-        } else if (selLL) {
-          focusMapOnStop(selectedStop.value);
-        } else if (activeRouteLine) {
-          mapMobile.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
-        }
-      } catch (e) {
-        dbgError("expandMap fit", e);
-      }
+        if (selLL && userLL) mapMobile.fitBounds([userLL, selLL], { padding: [70, 70] });
+        else if (selLL) focusMapOnStop(selectedStop.value);
+        else if (activeRouteLine) mapMobile.fitBounds(activeRouteLine.getBounds(), { padding: [40, 40] });
+      } catch (e) { dbgError("expandMap fit", e); }
     }
 
     function collapseMap() {
       mapExpanded.value = false;
-      if (!isMobile.value && isMapUsable(mapDesktop)) {
-        activeMap = mapDesktop;
-      }
+      if (!isMobile.value && isMapUsable(mapDesktop)) activeMap = mapDesktop;
     }
 
     function zoomIn() {
@@ -2613,7 +2516,6 @@ createApp({
     function handleResize() {
       if (mapDesktop) try { mapDesktop.invalidateSize(); } catch (e) {}
       if (mapMobile)  try { mapMobile.invalidateSize();  } catch (e) {}
-
       isMobile.value = window.matchMedia("(max-width: 900px)").matches;
       if (!isMobile.value) {
         showCompanyPicker.value = false;
@@ -2626,9 +2528,7 @@ createApp({
       }
     }
 
-    function saveFavouritesOnExit() {
-      try { saveFavourites(); } catch (e) {}
-    }
+    function saveFavouritesOnExit() { try { saveFavourites(); } catch (e) {} }
 
     let tickTimer = null;
     const clockText = ref(formatClock(new Date()));
@@ -2640,18 +2540,10 @@ createApp({
 
     function tick() {
       clockText.value = formatClock(new Date());
-      if (dataAge.value !== null && !refreshing.value) {
-        dataAge.value += 1;
-      }
-      if (!selectedStop.value) {
-        countdown.value = null;
-        return;
-      }
+      if (dataAge.value !== null && !refreshing.value) dataAge.value += 1;
+      if (!selectedStop.value) { countdown.value = null; return; }
       if (refreshing.value) return;
-      if (countdown.value === null) {
-        countdown.value = AUTO_REFRESH_INTERVAL;
-        return;
-      }
+      if (countdown.value === null) { countdown.value = AUTO_REFRESH_INTERVAL; return; }
       countdown.value -= 1;
       if (countdown.value <= 0) {
         countdown.value = AUTO_REFRESH_INTERVAL;
@@ -2660,30 +2552,21 @@ createApp({
     }
 
     function handleVisibility() {
-      if (document.visibilityState === "visible" && selectedStop.value) {
-        refreshEta();
-      }
-      if (document.visibilityState === "hidden") {
-        saveFavouritesOnExit();
-      }
+      if (document.visibilityState === "visible" && selectedStop.value) refreshEta();
+      if (document.visibilityState === "hidden") saveFavouritesOnExit();
     }
 
     onMounted(() => {
       applyFontScale(fontScale.value);
-
       initMaps();
       if (mapDesktop) buildLabelLayer(mapDesktop);
       loadRoutes();
-
-      // 預先下載票價數據
       fetchFareDb().catch(() => {});
-
       window.addEventListener("resize", handleResize);
       window.addEventListener("orientationchange", handleResize);
       window.addEventListener("beforeunload", saveFavouritesOnExit);
       window.addEventListener("pagehide", saveFavouritesOnExit);
       document.addEventListener("visibilitychange", handleVisibility);
-
       tickTimer = setInterval(tick, 1000);
     });
 
@@ -2711,8 +2594,7 @@ createApp({
       selectDirection, onStopClick, onStopMapClick,
       expandMap, collapseMap, zoomIn, zoomOut, clearDirection,
       toggleFavourite, removeFavourite, onFavClick,
-      manualRefresh,
-      formatMinutes, formatDistance,
+      manualRefresh, formatMinutes, formatDistance,
     };
   },
 }).mount("#app");
