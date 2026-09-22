@@ -298,7 +298,6 @@
   }
   .stop-list li.active .distance { background: #ffd5d5; color: #c0392b; }
 
-  /* === 巴士站地圖按鈕（只於手機顯示） === */
   .stop-list .stop-map-btn {
     display: none;
     flex-shrink: 0;
@@ -320,8 +319,6 @@
     width: 16px; height: 16px;
     display: block;
   }
-
-  .status { display: none; }
 
   .hint { color: #999; font-size: calc(13px * var(--font-scale)); padding: 6px 0; word-break: break-word; }
   .error { color: #c0392b; font-size: calc(12px * var(--font-scale)); margin-top: 6px; word-break: break-word; }
@@ -364,8 +361,6 @@
   }
   .map-zoom-btn:hover { background: #eaf1ff; }
   .map-zoom-btn:active { transform: scale(0.94); background: #dbe9ff; }
-
-  .map-row-mobile { display: none; }
 
   .eta-box {
     padding: 10px 14px; max-height: 220px;
@@ -505,11 +500,6 @@
     color: #c0392b;
   }
 
-  .map-row-mobile .map-icon {
-    width: 22px; height: 22px; flex-shrink: 0;
-    display: block;
-  }
-
   @media (max-width: 900px) {
     .layout {
       grid-template-columns: minmax(0, 1fr);
@@ -529,18 +519,13 @@
       max-height: none; overflow: visible;
     }
 
-    /* 手機：預設 3 欄 × 1 列，垂直滑動 */
-    .fav-slots {
+    /* 手機：預設全部顯示 6 個；只有 .collapsed 才收合成 1 列可滑動 */
+    .fav-slots.collapsed {
       max-height: 62px;
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       padding-right: 1px;
-    }
-    /* 展開狀態：顯示全部 6 個（2 列） */
-    .fav-slots.expanded {
-      max-height: none;
-      overflow-y: visible;
     }
     .fav-slot {
       height: 62px;
@@ -599,10 +584,6 @@
       .row .search-btn { padding: 10px 10px; font-size: calc(13px * var(--font-scale)); }
       .company-sheet .company-btn img { height: 36px; max-width: 74px; }
     }
-  }
-
-  @media (min-width: 901px) {
-    .map-row-mobile { display: none !important; }
   }
 
   .map-overlay { display: none; }
@@ -739,7 +720,7 @@
 
       <div class="fav-section">
         <div class="title"><span class="star">⭐</span>我的最愛</div>
-        <div class="fav-slots" :class="{ expanded: favExpanded }">
+        <div class="fav-slots" :class="{ collapsed: !favExpanded }">
           <div v-for="(fav, i) in favourites" :key="i"
                class="fav-slot"
                :class="fav ? 'filled' : 'empty'"
@@ -787,8 +768,6 @@
       </div>
 
       <div v-if="mobileSearching" class="searching-hint">正在搜尋路線…</div>
-
-      <div class="status">狀態：{{ statusText }}</div>
 
       <div v-if="!selectedDirectionLabel || pickingDirection">
         <div v-if="matchedRoutes.length > 1" class="direction-row">
@@ -1443,7 +1422,6 @@ createApp({
     const refreshing = ref(false);
     const loadingStops = ref(false);
     const error = ref("");
-    const statusText = ref("準備中…");
     const showDebug = ref(false);
     const stopListRef = ref(null);
     const mapExpanded = ref(false);
@@ -1453,7 +1431,7 @@ createApp({
     const mobileSearching = ref(false);
     const pickerCompanyIds = ref([]);
 
-    /* 我的最愛展開狀態（僅手機） */
+    /* 我的最愛展開狀態（僅手機）：預設展開，互動後收合 */
     const favExpanded = ref(true);
 
     const favourites = ref(loadFavouritesFromStorage());
@@ -1464,7 +1442,6 @@ createApp({
       writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
     }
 
-    /* 使用者一旦互動就收合最愛 */
     function collapseFavourites() {
       if (favExpanded.value) favExpanded.value = false;
     }
@@ -1527,8 +1504,7 @@ createApp({
 
     const mapRowText = computed(() => {
       if (selectedStop.value) return selectedStop.value.name;
-      if (stops.value.length) return "路線地圖";
-      return "請先選擇路線及方向";
+      return "路線地圖";
     });
 
     function findCurrentRoute() {
@@ -1560,17 +1536,14 @@ createApp({
       searched.value = false;
       mapExpanded.value = false;
       pickingDirection.value = false;
-      statusText.value = "載入路線清單中…";
       try {
         const list = await loadRouteListFor(company.value);
         if (token !== loadToken) return;
         allRoutes.value = list;
-        statusText.value = `已載入 ${list.length} 條路線`;
         if (isMobile.value) prefetchOtherLists(company.value);
       } catch (e) {
         if (token !== loadToken) return;
         error.value = "無法載入路線清單：" + e.message;
-        statusText.value = "路線清單載入失敗";
       }
     }
 
@@ -1581,11 +1554,8 @@ createApp({
     }
 
     async function searchRoute(q, autoDirectionKey = null) {
-      if (!q) { statusText.value = "請輸入路線號碼"; return; }
-      if (!allRoutes.value.length) {
-        statusText.value = "路線清單尚未載入完成，請稍候再試";
-        return;
-      }
+      if (!q) return;
+      if (!allRoutes.value.length) return;
 
       lastSearched.value = q.toUpperCase();
       searched.value = true;
@@ -1601,10 +1571,7 @@ createApp({
       pickingDirection.value = false;
 
       const count = matchedRoutes.value.length;
-      if (count === 0) {
-        statusText.value = `找不到路線「${q}」`;
-        return;
-      }
+      if (count === 0) return;
 
       if (autoDirectionKey) {
         const match = matchedRoutes.value.find(r => r.key === autoDirectionKey);
@@ -1615,18 +1582,14 @@ createApp({
       }
 
       if (count === 1) {
-        statusText.value = `找到 1 個方向`;
         await selectDirection(matchedRoutes.value[0]);
-      } else {
-        statusText.value = `找到 ${count} 個方向，請選擇`;
       }
     }
 
     async function onSearch() {
       const q = (routeInput.value || "").trim();
-      if (!q) { statusText.value = "請輸入巴士路線號碼"; return; }
+      if (!q) return;
 
-      // 使用者一搜尋就收合最愛（僅手機生效）
       collapseFavourites();
 
       if (!isMobile.value) {
@@ -1637,7 +1600,6 @@ createApp({
       const qUpper = q.toUpperCase();
       mobileSearching.value = true;
       error.value = "";
-      statusText.value = `搜尋「${q}」…`;
 
       try {
         const [kmbList, ctbList, nlbList] = await Promise.all([
@@ -1666,7 +1628,6 @@ createApp({
           etas.value = [];
           dataAge.value = null;
           countdown.value = null;
-          statusText.value = `找不到路線「${q}」`;
           return;
         }
 
@@ -1674,8 +1635,6 @@ createApp({
           const targetCompany = matches[0];
           if (company.value !== targetCompany) {
             company.value = targetCompany;
-            const c = companies.find(x => x.id === targetCompany);
-            statusText.value = `自動選擇 ${c ? c.name : targetCompany}…`;
             await loadRoutes();
           }
           await searchRoute(q);
@@ -1683,12 +1642,9 @@ createApp({
         }
 
         pickerCompanyIds.value = matches;
-        const names = matches.map(id => (companies.find(c => c.id === id) || {}).name || id).join("、");
-        statusText.value = `「${q}」由 ${names} 營運，請選擇`;
         showCompanyPicker.value = true;
       } catch (e) {
         error.value = "搜尋失敗：" + e.message;
-        statusText.value = "搜尋失敗";
       } finally {
         mobileSearching.value = false;
       }
@@ -1704,8 +1660,6 @@ createApp({
       const changed = company.value !== id;
       if (changed) {
         company.value = id;
-        const c = companies.find(x => x.id === id);
-        statusText.value = `載入${c ? c.name : ""}路線清單中…`;
       }
       if (changed || !allRoutes.value.length) {
         await loadRoutes();
@@ -1716,7 +1670,6 @@ createApp({
     function closeCompanyPicker() {
       showCompanyPicker.value = false;
       pickerCompanyIds.value = [];
-      statusText.value = "已取消選擇巴士公司";
     }
 
     function clearDirection() {
@@ -1728,7 +1681,6 @@ createApp({
       etas.value = [];
       dataAge.value = null;
       countdown.value = null;
-      statusText.value = "請重新選擇方向";
     }
 
     async function selectDirection(r) {
@@ -1757,7 +1709,6 @@ createApp({
         }
         const validStops = detailed.filter(s => isValidCoord(s.lat, s.lng));
         stops.value = validStops;
-        statusText.value = `路線 ${r.route} 共 ${validStops.length} 個站`;
 
         const targetMap = isMobile.value
           ? (mapExpanded.value ? mapMobile : null)
@@ -1791,15 +1742,11 @@ createApp({
         while (newFavs.length < MAX_FAVOURITES) newFavs.push(null);
         favourites.value = newFavs;
         saveFavourites();
-        statusText.value = "已從我的最愛移除";
         return;
       }
 
       const emptyIdx = favourites.value.findIndex(f => !f);
-      if (emptyIdx === -1) {
-        statusText.value = `我的最愛已滿（${MAX_FAVOURITES} 個），請按 ✕ 移除其中一個`;
-        return;
-      }
+      if (emptyIdx === -1) return;
 
       favourites.value[emptyIdx] = {
         company: realCompany,
@@ -1814,7 +1761,6 @@ createApp({
       };
       favourites.value = [...favourites.value];
       saveFavourites();
-      statusText.value = `已加入我的最愛：${r.route}`;
     }
 
     function removeFavourite(index) {
@@ -1825,20 +1771,13 @@ createApp({
       while (newFavs.length < MAX_FAVOURITES) newFavs.push(null);
       favourites.value = newFavs;
       saveFavourites();
-      statusText.value = "已移除最愛";
     }
 
     async function onFavClick(index) {
       const fav = favourites.value[index];
-      if (!fav) {
-        statusText.value = "這是空的最愛位置，搜尋路線後按 ☆ 加入";
-        return;
-      }
+      if (!fav) return;
 
-      // 使用者一按最愛就收合
       collapseFavourites();
-
-      statusText.value = `載入最愛 ${fav.route}…`;
 
       const targetCompany = fav.company === "LWB" ? "KMB" : fav.company;
 
@@ -1881,7 +1820,6 @@ createApp({
 
     async function autoLocateNearestStop() {
       if (!stops.value.length) return;
-      statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站（定位中…）`;
       try {
         const me = await getUserPosition();
         showUserMarker(me.lat, me.lng);
@@ -1893,19 +1831,10 @@ createApp({
           s.distance = haversineMeters(me.lat, me.lng, s.lat, s.lng);
           if (s.distance < minDist) { minDist = s.distance; nearest = s; }
         }
-        if (!nearest) {
-          statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站`;
-          return;
-        }
-        statusText.value = `最近車站：${nearest.name}（${formatDistance(minDist)}）`;
+        if (!nearest) return;
         await applySelection(nearest);
       } catch (e) {
-        const friendly =
-          /授權|permission/i.test(e.message) ? "未授權定位，請手動選擇巴士站" :
-          /超時|timeout/i.test(e.message)    ? "定位超時，請手動選擇巴士站" :
-          /位置|position/i.test(e.message)   ? "無法取得位置資訊" :
-          "定位失敗，請手動選擇巴士站";
-        statusText.value = `路線 ${selectedRoute.value?.route || ''} 共 ${stops.value.length} 個站（${friendly}）`;
+        /* 定位失敗：不打擾使用者，讓其手動選擇 */
       }
     }
 
@@ -1947,7 +1876,7 @@ createApp({
     /* 點巴士站地圖按鈕：先選站，再打開全螢幕地圖 */
     async function onStopMapClick(stop) {
       collapseFavourites();
-      await applySelection(stop);   // 這會載入 ETA 並將地圖聚焦到該站
+      await applySelection(stop);
       await nextTick();
       await expandMap();
     }
@@ -2127,10 +2056,7 @@ createApp({
     }
 
     async function expandMap() {
-      if (!stops.value.length) {
-        statusText.value = "請先選擇路線及方向";
-        return;
-      }
+      if (!stops.value.length) return;
       mapExpanded.value = true;
       await nextTick();
       await new Promise((r) => requestAnimationFrame(() => r()));
@@ -2294,7 +2220,7 @@ createApp({
       companies, company, routeInput, lastSearched, searched,
       allRoutes, matchedRoutes, routeKey, stops, selectedStop, etas,
       dataAge, countdown, refreshing, clockText,
-      loadingStops, error, statusText, showDebug, stopListRef,
+      loadingStops, error, showDebug, stopListRef,
       mapExpanded, mapRowText, pickingDirection, selectedDirectionLabel,
       isMobile, showCompanyPicker, mobileSearching, pickerCompanyIds,
       availableCompaniesForPicker, favExpanded,
