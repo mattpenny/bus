@@ -57,7 +57,6 @@
     white-space: nowrap; flex-shrink: 0;
   }
 
-  /* 字體放大 controls */
   .font-size-controls {
     display: flex; align-items: center; gap: 4px; flex-shrink: 0;
   }
@@ -101,7 +100,6 @@
     min-width: 0;
   }
 
-  /* === 我的最愛：收窄上下留白 === */
   .fav-section { margin-bottom: 8px; margin-top: 0; min-width: 0; }
   .fav-section .title {
     font-size: calc(13px * var(--font-scale)); color: #333; margin-bottom: 4px;
@@ -166,7 +164,6 @@
   }
   .fav-slot .fav-remove:active { background: #c62828; }
 
-  /* === 分隔線：上下留白收窄 === */
   .fav-divider { border: none; border-top: 1px solid #eef; margin: 6px 0; }
 
   .row {
@@ -281,8 +278,7 @@
     padding: 8px 10px; border-bottom: 1px solid #eef;
     cursor: pointer; font-size: calc(13px * var(--font-scale));
     transition: background 0.15s;
-    display: flex; justify-content: space-between;
-    align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 6px;
     min-width: 0;
   }
   .stop-list li:hover { background: #f0f6ff; }
@@ -290,8 +286,9 @@
     background: #ffe0e0; color: #c0392b; font-weight: 700;
     border-left: 4px solid #e53935; padding-left: 6px;
   }
-  .stop-list li > span:first-child {
-    min-width: 0; overflow: hidden;
+  .stop-list li .stop-name {
+    flex: 1 1 0; min-width: 0;
+    overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
   }
   .stop-list .distance {
@@ -300,6 +297,29 @@
     font-weight: 600; flex-shrink: 0;
   }
   .stop-list li.active .distance { background: #ffd5d5; color: #c0392b; }
+
+  /* === 巴士站地圖按鈕（只於手機顯示） === */
+  .stop-list .stop-map-btn {
+    display: none;
+    flex-shrink: 0;
+    width: 30px; height: 30px;
+    border: 1px solid #1a3d7c;
+    background: #eaf1ff;
+    border-radius: 8px;
+    color: #1a3d7c;
+    cursor: pointer;
+    align-items: center; justify-content: center;
+    padding: 0;
+    transition: all 0.15s;
+  }
+  .stop-list .stop-map-btn:active {
+    background: #c8dcff;
+    transform: scale(0.94);
+  }
+  .stop-list .stop-map-btn svg {
+    width: 16px; height: 16px;
+    display: block;
+  }
 
   .status { display: none; }
 
@@ -396,7 +416,6 @@
   }
   .eta-box li:last-child { border-bottom: none; }
 
-  /* === 第 N 班：字級與時間一致 === */
   .eta-box .rank {
     width: 78px;
     color: #1a3d7c;
@@ -464,7 +483,6 @@
     100% { transform: scale(1); }
   }
 
-  /* === 地圖上巴士站名稱標籤 === */
   .stop-name-label {
     background: rgba(255,255,255,0.92);
     border: 1px solid #1a3d7c;
@@ -487,7 +505,6 @@
     color: #c0392b;
   }
 
-  /* === 地圖圖示 === */
   .map-row-mobile .map-icon {
     width: 22px; height: 22px; flex-shrink: 0;
     display: block;
@@ -512,14 +529,18 @@
       max-height: none; overflow: visible;
     }
 
-    /* === 我的最愛：手機版 3 欄 × 1 列，垂直滑動 === */
+    /* 手機：預設 3 欄 × 1 列，垂直滑動 */
     .fav-slots {
       max-height: 62px;
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
-      scroll-snap-type: y proximity;
       padding-right: 1px;
+    }
+    /* 展開狀態：顯示全部 6 個（2 列） */
+    .fav-slots.expanded {
+      max-height: none;
+      overflow-y: visible;
     }
     .fav-slot {
       height: 62px;
@@ -527,7 +548,6 @@
       padding: 4px 3px;
       gap: 1px;
       overflow: hidden;
-      scroll-snap-align: start;
     }
     .fav-slot .fav-remove {
       top: 1px;
@@ -545,18 +565,13 @@
     .fav-slot .fav-plus { font-size: calc(18px * var(--font-scale)); }
     .fav-slot .fav-hint { font-size: calc(9px * var(--font-scale)); }
 
-    .map-row-mobile {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px; border: 1px solid #dde;
-      border-radius: 8px; background: #f8faff;
-      cursor: pointer; margin-bottom: 8px;
-      user-select: none; min-width: 0;
+    /* 顯示巴士站地圖按鈕（僅手機） */
+    .stop-list .stop-map-btn {
+      display: flex;
+      width: 28px; height: 28px;
     }
-    .map-row-mobile .pin { font-size: 18px; flex-shrink: 0; }
-    .map-row-mobile .text {
-      flex: 1 1 0; min-width: 0;
-      font-size: calc(13px * var(--font-scale)); color: #333; font-weight: 600;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .stop-list .stop-map-btn svg {
+      width: 15px; height: 15px;
     }
 
     .eta-box { max-height: 220px; padding: 8px 12px; }
@@ -724,7 +739,7 @@
 
       <div class="fav-section">
         <div class="title"><span class="star">⭐</span>我的最愛</div>
-        <div class="fav-slots">
+        <div class="fav-slots" :class="{ expanded: favExpanded }">
           <div v-for="(fav, i) in favourites" :key="i"
                class="fav-slot"
                :class="fav ? 'filled' : 'empty'"
@@ -775,17 +790,6 @@
 
       <div class="status">狀態：{{ statusText }}</div>
 
-      <div class="map-row-mobile" @click="expandMap">
-        <span class="pin">📍</span>
-        <span class="text">{{ mapRowText }}</span>
-        <svg class="map-icon" viewBox="0 0 24 24" fill="none" stroke="#1a3d7c" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6" fill="#eaf1ff"/>
-          <line x1="8" y1="3" x2="8" y2="18"/>
-          <line x1="16" y1="6" x2="16" y2="21"/>
-        </svg>
-      </div>
-
       <div v-if="!selectedDirectionLabel || pickingDirection">
         <div v-if="matchedRoutes.length > 1" class="direction-row">
           <span class="label">方向</span>
@@ -825,7 +829,18 @@
               :data-stop-id="s.id"
               :class="{ active: selectedStop && selectedStop.id === s.id }"
               @click="onStopClick(s)">
-            <span>{{ s.name }}</span>
+            <span class="stop-name">{{ s.name }}</span>
+            <button class="stop-map-btn"
+                    @click.stop="onStopMapClick(s)"
+                    :aria-label="'查看 ' + s.name + ' 地圖'"
+                    title="查看地圖">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6" fill="#eaf1ff"/>
+                <line x1="8" y1="3" x2="8" y2="18"/>
+                <line x1="16" y1="6" x2="16" y2="21"/>
+              </svg>
+            </button>
             <span v-if="s.distance !== undefined" class="distance">
               {{ formatDistance(s.distance) }}
             </span>
@@ -986,7 +1001,6 @@ function isLwbRoute(routeNum) {
   return LWB_ROUTE_PREFIXES.some(p => r.startsWith(p));
 }
 
-/* ---------- KMB + LWB ---------- */
 async function fetchKmbRoutes() {
   const j = await getJSON(`${KMB_BASE}/route/`);
   return j.data.map(r => ({
@@ -1028,7 +1042,6 @@ async function fetchKmbEta(stopId, route, serviceType = "1") {
   return { items, ageSeconds };
 }
 
-/* ---------- CTB ---------- */
 async function fetchCitybusRoutes() {
   const j = await getJSON(`${CTB_BASE}/route/CTB`);
   const list = [];
@@ -1074,7 +1087,6 @@ async function fetchCitybusEta(stopId, route) {
   return { items, ageSeconds };
 }
 
-/* ---------- NLB ---------- */
 async function fetchNlbRoutes() {
   const j = await getJSON(`${NLB_BASE}/route.php?action=list`);
   return (j.routes || []).map(r => {
@@ -1255,7 +1267,7 @@ function makeStopLabelIcon(name, selected) {
 }
 
 /* =========================================================
-   儲存層（雙層備援）
+   儲存層
    ========================================================= */
 const FAV_STORAGE_KEY = "hk-bus-eta-favourites";
 const FONT_SCALE_KEY = "hk-bus-font-scale";
@@ -1390,7 +1402,6 @@ const NLB_LOGO = "data:image/svg+xml;utf8," + encodeURIComponent(`
    ========================================================= */
 createApp({
   setup() {
-    /* ---------- 字體大小（持久化） ---------- */
     const fontScale = ref(loadFontScale());
 
     function applyFontScale(scale) {
@@ -1440,7 +1451,10 @@ createApp({
     const isMobile = ref(window.matchMedia("(max-width: 900px)").matches);
     const showCompanyPicker = ref(false);
     const mobileSearching = ref(false);
-    const pickerCompanyIds = ref([]); // ids available in the picker
+    const pickerCompanyIds = ref([]);
+
+    /* 我的最愛展開狀態（僅手機） */
+    const favExpanded = ref(true);
 
     const favourites = ref(loadFavouritesFromStorage());
 
@@ -1450,7 +1464,11 @@ createApp({
       writeCookie(FAV_STORAGE_KEY, json, FAV_COOKIE_DAYS);
     }
 
-    /* ---------- 路線清單快取（按公司） ---------- */
+    /* 使用者一旦互動就收合最愛 */
+    function collapseFavourites() {
+      if (favExpanded.value) favExpanded.value = false;
+    }
+
     const routeListsCache = { KMB: null, CTB: null, NLB: null };
     const routeListPromises = { KMB: null, CTB: null, NLB: null };
 
@@ -1509,7 +1527,7 @@ createApp({
 
     const mapRowText = computed(() => {
       if (selectedStop.value) return selectedStop.value.name;
-      if (stops.value.length) return "點擊查看路線地圖";
+      if (stops.value.length) return "路線地圖";
       return "請先選擇路線及方向";
     });
 
@@ -1604,18 +1622,18 @@ createApp({
       }
     }
 
-    /* ---------- 搜尋入口（桌面：直接搜尋；手機：跨公司智慧搜尋） ---------- */
     async function onSearch() {
       const q = (routeInput.value || "").trim();
       if (!q) { statusText.value = "請輸入巴士路線號碼"; return; }
 
-      // 桌面：保持原有行為（有公司按鈕）
+      // 使用者一搜尋就收合最愛（僅手機生效）
+      collapseFavourites();
+
       if (!isMobile.value) {
         searchRoute(q);
         return;
       }
 
-      // 手機：跨公司檢查
       const qUpper = q.toUpperCase();
       mobileSearching.value = true;
       error.value = "";
@@ -1639,7 +1657,6 @@ createApp({
           .map(c => c.id);
 
         if (matches.length === 0) {
-          // 找不到：清空狀態，讓「找不到路線」提示出現
           searched.value = true;
           lastSearched.value = qUpper;
           routeKey.value = "";
@@ -1654,7 +1671,6 @@ createApp({
         }
 
         if (matches.length === 1) {
-          // 唯一公司：自動切換，跳過公司選擇
           const targetCompany = matches[0];
           if (company.value !== targetCompany) {
             company.value = targetCompany;
@@ -1666,7 +1682,6 @@ createApp({
           return;
         }
 
-        // 多間公司：彈出選擇器（只顯示有營運該路線的公司）
         pickerCompanyIds.value = matches;
         const names = matches.map(id => (companies.find(c => c.id === id) || {}).name || id).join("、");
         statusText.value = `「${q}」由 ${names} 營運，請選擇`;
@@ -1683,6 +1698,8 @@ createApp({
       showCompanyPicker.value = false;
       const q = (routeInput.value || "").trim();
       if (!q) return;
+
+      collapseFavourites();
 
       const changed = company.value !== id;
       if (changed) {
@@ -1770,7 +1787,6 @@ createApp({
         f && f.company === realCompany && f.directionKey === routeKey.value
       );
       if (existingIdx !== -1) {
-        // 移除並壓縮（後面的往前移）
         const newFavs = favourites.value.filter((_, i) => i !== existingIdx);
         while (newFavs.length < MAX_FAVOURITES) newFavs.push(null);
         favourites.value = newFavs;
@@ -1805,7 +1821,6 @@ createApp({
       const fav = favourites.value[index];
       if (!fav) return;
       if (!confirm(`確定移除最愛「${fav.route} ${fav.dest_tc}」？`)) return;
-      // 移除並壓縮
       const newFavs = favourites.value.filter((_, i) => i !== index);
       while (newFavs.length < MAX_FAVOURITES) newFavs.push(null);
       favourites.value = newFavs;
@@ -1819,6 +1834,9 @@ createApp({
         statusText.value = "這是空的最愛位置，搜尋路線後按 ☆ 加入";
         return;
       }
+
+      // 使用者一按最愛就收合
+      collapseFavourites();
 
       statusText.value = `載入最愛 ${fav.route}…`;
 
@@ -1924,6 +1942,14 @@ createApp({
 
     async function onStopClick(stop) {
       await applySelection(stop);
+    }
+
+    /* 點巴士站地圖按鈕：先選站，再打開全螢幕地圖 */
+    async function onStopMapClick(stop) {
+      collapseFavourites();
+      await applySelection(stop);   // 這會載入 ETA 並將地圖聚焦到該站
+      await nextTick();
+      await expandMap();
     }
 
     async function refreshEta(manual = false) {
@@ -2242,7 +2268,6 @@ createApp({
     }
 
     onMounted(() => {
-      // 套用已儲存的字體大小
       applyFontScale(fontScale.value);
 
       initMaps();
@@ -2272,10 +2297,10 @@ createApp({
       loadingStops, error, statusText, showDebug, stopListRef,
       mapExpanded, mapRowText, pickingDirection, selectedDirectionLabel,
       isMobile, showCompanyPicker, mobileSearching, pickerCompanyIds,
-      availableCompaniesForPicker,
+      availableCompaniesForPicker, favExpanded,
       favourites, isCurrentFavourite,
       onCompanyChange, onSearch, onCompanyPick, closeCompanyPicker,
-      selectDirection, onStopClick,
+      selectDirection, onStopClick, onStopMapClick,
       expandMap, collapseMap, zoomIn, zoomOut, clearDirection,
       toggleFavourite, removeFavourite, onFavClick,
       manualRefresh,
