@@ -42,7 +42,6 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  /* iOS Safari: 使用 -webkit-fill-available 避免被 URL bar 遮擋 */
   @supports (-webkit-touch-callout: none) {
     html, body {
       height: -webkit-fill-available;
@@ -263,27 +262,28 @@
     font-size: calc(15px * var(--font-scale));
     border-radius: 10px;
   }
+  /* === 閃爍速度已調慢：1.2s → 2.4s，透明度由 0.15 → 0.3 === */
   .row.landing input[type="text"]::placeholder {
     color: #1a3d7c;
     font-weight: 700;
     opacity: 1;
-    animation: placeholderBlink 1.2s ease-in-out infinite;
-    -webkit-animation: placeholderBlink 1.2s ease-in-out infinite;
+    animation: placeholderBlink 2.4s ease-in-out infinite;
+    -webkit-animation: placeholderBlink 2.4s ease-in-out infinite;
   }
   .row.landing input[type="text"]::-webkit-input-placeholder {
     color: #1a3d7c;
     font-weight: 700;
     opacity: 1;
-    animation: placeholderBlink 1.2s ease-in-out infinite;
-    -webkit-animation: placeholderBlink 1.2s ease-in-out infinite;
+    animation: placeholderBlink 2.4s ease-in-out infinite;
+    -webkit-animation: placeholderBlink 2.4s ease-in-out infinite;
   }
   @keyframes placeholderBlink {
     0%, 100% { opacity: 1; }
-    50%      { opacity: 0.15; }
+    50%      { opacity: 0.3; }
   }
   @-webkit-keyframes placeholderBlink {
     0%, 100% { opacity: 1; }
-    50%      { opacity: 0.15; }
+    50%      { opacity: 0.3; }
   }
 
   .company-label { font-size: calc(13px * var(--font-scale)); color: #333; margin-bottom: 6px; }
@@ -447,7 +447,6 @@
     overflow: hidden;
   }
 
-  /* 地圖容器：使用 absolute 定位更穩定（Safari 對 flex/grid 內 height:100% 有時失效） */
   .map-wrap {
     border-radius: 10px; overflow: hidden;
     min-height: 0; min-width: 0;
@@ -695,7 +694,6 @@
     .stop-list { max-height: 60vh; }
 
     .row label { min-width: 60px; }
-    /* iOS Safari: input 字級 < 16px 會觸發自動縮放 → 用 max() 保證最少 16px */
     .row input[type="text"] {
       font-size: max(16px, calc(16px * var(--font-scale)));
       padding: 10px 12px;
@@ -735,7 +733,6 @@
     }
   }
 
-  /* 全螢幕覆蓋層：使用明確 top/right/bottom/left（相容舊 Safari） */
   .map-overlay { display: none; }
   @media (max-width: 900px) {
     .map-overlay {
@@ -1121,19 +1118,15 @@ function parseDate(input) {
   const s = String(input).trim();
   if (!s) return null;
 
-  // 嘗試原生（ISO 8601 格式最保險）
   let d = new Date(s);
   if (!isNaN(d.getTime())) return d;
 
-  // 空格替換為 T（NLB 常見格式 "2024-01-01 12:00:00"）
   d = new Date(s.replace(" ", "T"));
   if (!isNaN(d.getTime())) return d;
 
-  // 加上香港時區
   d = new Date(s.replace(" ", "T") + "+08:00");
   if (!isNaN(d.getTime())) return d;
 
-  // 萬用格式：年-月-日 時:分:秒
   const m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
   if (m) {
     d = new Date(
